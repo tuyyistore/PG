@@ -24,6 +24,18 @@ Kalau database masih baru (belum pernah dipakai sama sekali), jalankan urutan le
 `schema.sql` → `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql`. **`seed.sql` sekarang kosong** (tidak
 ada lagi 10 produk contoh) — semua produk & kategori 100% diisi manual lewat Dashboard Admin.
 
+## 11. URL per halaman, struktur file, grafik (tanpa migration)
+- **React Router:** tiap halaman punya URL sendiri — `/`, `/produk`, `/pesanan`, `/topup`,
+  `/checkout`, `/pengaturan`, `/admin`. Bisa di-refresh, di-bookmark, dan tombol kembali browser
+  berpindah antar-halaman. Path tak dikenal → Dashboard; `/admin` untuk non-admin → Dashboard;
+  `/checkout` dengan keranjang kosong → Produk. Admin tetap langsung ke Dashboard Admin saat
+  membuka `/`. (`vercel.json` sudah me-rewrite semua path ke `index.html`.)
+- **`App.tsx` dipecah** (dari ±1.300 jadi ±190 baris):
+  `src/pages/*` (tiap halaman, termasuk `AdminPage.tsx`), `src/components/*` (Layout, Brand,
+  Orders, QRISModal, PaymentMethods, SpendingChart), `src/types.ts`, `src/lib/mappers.ts`.
+  Isi fungsi tidak diubah — hanya dipindah.
+- **Grafik pengeluaran** 6 bulan terakhir di Dashboard (bulan ini + total, tooltip per bulan).
+
 ## 10. Peningkatan pengalaman pengguna (tanpa migration)
 - **Notifikasi toast** untuk aksi berhasil (simpan pengaturan, tambah ke keranjang, pembelian
   berhasil, salin ID/nominal, aksi admin) — tidak lagi menggeser isi halaman.

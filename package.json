@@ -14,11 +14,12 @@
     "format": "oxfmt"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "gobiz-payment": "github:kavionn/gobiz-payment",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "qrcode": "^1.5.4",
-    "gobiz-payment": "github:kavionn/gobiz-payment",
-    "@supabase/supabase-js": "^2.45.0"
+    "react-router": "^7.9.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
