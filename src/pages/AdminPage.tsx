@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, uploadFile, type Row } from './lib/supabase'
-import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from './ui'
-import { useConfirm, useToast } from './feedback'
+import { api, uploadFile, type Row } from '../lib/supabase'
+import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from '../ui'
+import { useConfirm, useToast } from '../feedback'
 
 const MUTED = { color: '#94a3b8' }
 const FIELD = 'input input-sm'
