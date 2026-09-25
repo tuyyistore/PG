@@ -9,9 +9,23 @@ Buka **Supabase → SQL Editor**, jalankan berurutan (sekali saja, kalau belum p
    supaya foto produk yang dibeli ikut tampil di Dashboard/Pesanan Saya, bukan cuma di
    halaman Produk.
 
+3. `supabase/migration_v4.sql` — **baru (keamanan)**, nominal unik QRIS top up sekarang dibuat
+   di server lewat RPC `create_topup_payment`. Klien tidak bisa lagi INSERT langsung ke tabel
+   `payments`. **Wajib dijalankan bersamaan dengan deploy kode terbaru** — kalau kode baru
+   di-deploy tanpa migration ini, tombol "Bayar via QRIS" akan gagal.
+
 Kalau database masih baru (belum pernah dipakai sama sekali), jalankan urutan lengkap:
-`schema.sql` → `migration_v2.sql` → `migration_v3.sql`. **`seed.sql` sekarang kosong** (tidak
+`schema.sql` → `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql`. **`seed.sql` sekarang kosong** (tidak
 ada lagi 10 produk contoh) — semua produk & kategori 100% diisi manual lewat Dashboard Admin.
+
+## 8. Nominal unik QRIS dibuat di server
+- Sebelumnya browser membuat kode unik 1–99 sendiri dan menulis langsung ke tabel `payments`,
+  sehingga nominal dasar (`payload.amount`) bisa dimanipulasi — misalnya bayar Rp 10.001 tapi
+  saldo yang masuk Rp 1.000.000.
+- Sekarang browser hanya mengirim nominal dasar ke RPC `create_topup_payment`. Server
+  memvalidasi nominal (Rp 1.000 – Rp 10.000.000), memilih kode 1–99 yang belum dipakai payment
+  pending lain (dikunci supaya request bersamaan tidak bentrok), lalu menyimpan payment.
+- `api/check-payment.js` juga menolak payment top up yang selisih nominalnya bukan 1–99.
 
 ## 7. Pembaruan sesi ini
 - **Pencarian pesanan (Admin → Pesanan):** ada kolom pencarian di atas daftar pesanan —

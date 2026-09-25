@@ -27,6 +27,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'expired' })
   }
 
+  // Pengaman: top up yang sah selalu punya selisih nominal bayar − nominal dasar = 1–99
+  // (dibuat server lewat RPC create_topup_payment). Tolak baris yang tidak memenuhi.
+  if (payment.kind === 'topup') {
+    const base = Number(payment.payload?.amount)
+    const code = Number(payment.amount) - base
+    if (!Number.isInteger(base) || base <= 0 || code < 1 || code > 99) {
+      await supabaseAdmin.from('payments').update({ status: 'expired' }).eq('id', paymentId)
+      return res.status(400).json({ status: 'expired', error: 'payment tidak valid' })
+    }
+  }
+
   let found
   try {
     found = await findIncomingPayment(payment.amount, { sinceMinutes: 60 })
@@ -48,7 +59,7 @@ export default async function handler(req, res) {
       )
     }
   } else if (payment.kind === 'topup') {
-    const baseAmount = Number(payment.payload?.amount ?? payment.amount)
+    const baseAmount = Number(payment.payload.amount)
     await supabaseAdmin.from('topups').insert({ user_id: payment.user_id, amount: baseAmount, status: 'approved' })
     const { data: prof } = await supabaseAdmin.from('profiles').select('saldo').eq('id', payment.user_id).maybeSingle()
     await supabaseAdmin.from('profiles').update({ saldo: Number(prof?.saldo ?? 0) + baseAmount }).eq('id', payment.user_id)
