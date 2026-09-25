@@ -4,9 +4,9 @@
 // baris `payments` yang masih pending, langsung:
 //  - kind='order'  → insert baris ke `orders` dengan status 'aktif' untuk tiap item di payload
 //  - kind='topup'  → insert baris ke `topups` (status 'approved') + tambah saldo di `profiles`
-// lalu tandai payment sebagai 'paid'.
+// lalu tandai payment sebagai 'paid' — semuanya atomik lewat RPC settle_payment (migration_v5.sql).
 import { supabaseAdmin } from './_supabaseAdmin.js'
-import { findIncomingPayment, claimPayment } from './_gobiz.js'
+import { findIncomingPayment } from './_gobiz.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'method not allowed' })
@@ -48,24 +48,20 @@ export default async function handler(req, res) {
 
   if (!found) return res.status(200).json({ status: 'pending' })
 
-  // Tandai transaksi ini terpakai dulu (cegah request polling paralel klaim dua kali).
-  await claimPayment(found.txId, paymentId, payment.amount)
-
-  if (payment.kind === 'order') {
-    const items = Array.isArray(payment.payload) ? payment.payload : []
-    if (items.length) {
-      await supabaseAdmin.from('orders').insert(
-        items.map(i => ({ ...i, user_id: payment.user_id, status: 'aktif' }))
-      )
-    }
-  } else if (payment.kind === 'topup') {
-    const baseAmount = Number(payment.payload.amount)
-    await supabaseAdmin.from('topups').insert({ user_id: payment.user_id, amount: baseAmount, status: 'approved' })
-    const { data: prof } = await supabaseAdmin.from('profiles').select('saldo').eq('id', payment.user_id).maybeSingle()
-    await supabaseAdmin.from('profiles').update({ saldo: Number(prof?.saldo ?? 0) + baseAmount }).eq('id', payment.user_id)
+  // Klaim transaksi + tambah saldo / buat pesanan + tandai paid dalam SATU transaksi
+  // database (lihat supabase/migration_v5.sql) — aman walau polling berjalan paralel.
+  const { data: outcome, error: settleErr } = await supabaseAdmin.rpc('settle_payment', {
+    p_payment_id: paymentId,
+    p_tx_id: found.txId,
+  })
+  if (settleErr) {
+    console.error('Gagal settle payment', paymentId, settleErr.message)
+    return res.status(200).json({ status: 'pending', warning: 'Pembayaran terdeteksi, sedang diproses...' })
   }
 
-  await supabaseAdmin.from('payments').update({ status: 'paid', matched_tx_id: found.txId }).eq('id', paymentId)
-
-  return res.status(200).json({ status: 'paid' })
+  if (outcome === 'paid' || outcome === 'already_paid') return res.status(200).json({ status: 'paid' })
+  if (outcome === 'expired') return res.status(200).json({ status: 'expired' })
+  if (outcome === 'not_found') return res.status(404).json({ error: 'payment tidak ditemukan' })
+  // 'tx_already_claimed': transaksi GoBiz ini sudah dipakai payment lain → tetap tunggu.
+  return res.status(200).json({ status: 'pending' })
 }
