@@ -667,13 +667,18 @@ function SaldoPage({ saldo, onPaid }: { saldo: number; onPaid: () => void }) {
   const presets = [10000, 25000, 50000, 100000, 250000, 500000]
   const finalNominal = nominal ?? Number(custom.replace(/\D/g, ''))
 
+  const [creating, setCreating] = useState(false)
+  const [payErr, setPayErr] = useState('')
+
+  // Nominal unik (kode 1–99) dibuat & divalidasi di server lewat RPC `create_topup_payment`
+  // (lihat supabase/migration_v4.sql) — klien hanya mengirim nominal dasar.
   async function startPayment() {
-    if (finalNominal <= 0) return
-    const uniqueAmount = finalNominal + Math.floor(Math.random() * 99) + 1
+    if (finalNominal <= 0 || creating) return
+    setCreating(true); setPayErr('')
     try {
-      const [row] = await api('payments', { method: 'POST', body: { kind: 'topup', amount: uniqueAmount, payload: { amount: finalNominal } } })
-      setPayment({ id: Number(row.id), amount: uniqueAmount })
-    } catch (e) { console.error(e) }
+      const row = await api<Row>('rpc/create_topup_payment', { method: 'POST', body: { base_amount: finalNominal } })
+      setPayment({ id: Number(row.id), amount: Number(row.amount) })
+    } catch (e) { setPayErr((e as Error).message || 'Gagal membuat pembayaran. Coba lagi.') } finally { setCreating(false) }
   }
 
   return (
@@ -746,8 +751,11 @@ function SaldoPage({ saldo, onPaid }: { saldo: number; onPaid: () => void }) {
             <span className="text-sm text-muted-foreground">Total</span>
             <span className="text-xl font-semibold text-white tabular">{finalNominal > 0 ? formatRp(finalNominal) : '—'}</span>
           </div>
-          <button onClick={startPayment} disabled={finalNominal <= 0} className="btn btn-primary btn-lg btn-block">
-            <Icon name="qr" size={18} /> Bayar via QRIS · {finalNominal > 0 ? formatRp(finalNominal) : '—'}
+          {payErr && <div className="alert alert-danger mb-3"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{payErr}</span></div>}
+          <button onClick={startPayment} disabled={finalNominal <= 0 || creating} className="btn btn-primary btn-lg btn-block">
+            {creating
+              ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Membuat QRIS...</>
+              : <><Icon name="qr" size={18} /> Bayar via QRIS · {finalNominal > 0 ? formatRp(finalNominal) : '—'}</>}
           </button>
           <p className="hint mt-3 text-center">Nominal unik ditambahkan otomatis. Saldo bertambah setelah top up dikonfirmasi.</p>
         </div>
