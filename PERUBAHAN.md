@@ -14,9 +14,29 @@ Buka **Supabase → SQL Editor**, jalankan berurutan (sekali saja, kalau belum p
    `payments`. **Wajib dijalankan bersamaan dengan deploy kode terbaru** — kalau kode baru
    di-deploy tanpa migration ini, tombol "Bayar via QRIS" akan gagal.
 
+4. `supabase/migration_v5.sql` — **baru (keamanan)**, konfirmasi pembayaran QRIS jadi atomik
+   (saldo/pesanan tidak bisa dobel), pengguna tidak bisa lagi mengubah kolom `saldo` sendiri,
+   pembelian pakai saldo tidak bisa membuat saldo minus, dan pengguna tidak bisa lagi membuat
+   baris `orders` / `topups` / `payments` sendiri lewat API. **Wajib dijalankan bersamaan
+   dengan deploy kode terbaru** (`api/check-payment.js` sekarang memanggil RPC `settle_payment`).
+
 Kalau database masih baru (belum pernah dipakai sama sekali), jalankan urutan lengkap:
-`schema.sql` → `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql`. **`seed.sql` sekarang kosong** (tidak
+`schema.sql` → `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql`. **`seed.sql` sekarang kosong** (tidak
 ada lagi 10 produk contoh) — semua produk & kategori 100% diisi manual lewat Dashboard Admin.
+
+## 9. Saldo tidak bisa dobel atau dimanipulasi
+- **Konfirmasi QRIS atomik:** `api/check-payment.js` sekarang memanggil RPC `settle_payment` yang
+  mengunci baris payment, mengklaim transaksi GoBiz, menambah saldo (atau membuat pesanan), dan
+  menandai payment `paid` dalam satu transaksi database. Sebelumnya dua polling bersamaan bisa
+  sama-sama menambah saldo.
+- **Kolom `saldo` terkunci:** pengguna hanya boleh mengubah nama, foto, WhatsApp, dan email
+  kontak di profilnya. Sebelumnya siapa pun bisa mengubah saldonya sendiri lewat API.
+- **Beli pakai saldo:** pengecekan & pemotongan saldo digabung dalam satu UPDATE, jadi dua
+  pembelian bersamaan tidak bisa membuat saldo minus. Ditambah constraint `saldo >= 0`.
+- **Tidak ada lagi baris palsu:** policy INSERT klien di `orders` dan `topups` dihapus, dan hak
+  INSERT/DELETE ke `orders`, `topups`, `payments` dicabut dari pengguna. Pesanan & top up hanya
+  dibuat oleh fungsi server. Top up `pending` lama sebaiknya dicek dulu sebelum disetujui
+  (query contoh ada di akhir `migration_v5.sql`).
 
 ## 8. Nominal unik QRIS dibuat di server
 - Sebelumnya browser membuat kode unik 1–99 sendiri dan menulis langsung ke tabel `payments`,
