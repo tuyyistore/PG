@@ -10,6 +10,8 @@
 --    termasuk `saldo`.
 -- 3. buy_with_saldo(): potong saldo secara atomik (tidak bisa minus lewat dua
 --    pembelian bersamaan).
+-- 4. Pengguna tidak bisa lagi membuat baris `orders` / `topups` sendiri lewat API.
+--    Semua baris sah dibuat oleh fungsi server (buy_with_saldo, settle_payment).
 
 -- ── 1. Konfirmasi pembayaran atomik ──────────────────────────────────────────
 create or replace function public.settle_payment(p_payment_id bigint, p_tx_id text)
@@ -96,5 +98,18 @@ grant execute on function public.buy_with_saldo(bigint[]) to authenticated;
 -- Pengaman terakhir: saldo tidak pernah negatif.
 alter table public.profiles drop constraint if exists profiles_saldo_nonnegative;
 alter table public.profiles add constraint profiles_saldo_nonnegative check (saldo >= 0) not valid;
+
+-- ── 4. Tutup INSERT langsung dari klien ke orders & topups ──────────────────
+-- Frontend tidak pernah INSERT ke dua tabel ini; pesanan & top up hanya dibuat oleh
+-- fungsi security definer di atas (yang tidak terpengaruh RLS/privilege klien).
+drop policy if exists "order: buat sendiri" on public.orders;
+drop policy if exists "topup: buat sendiri" on public.topups;
+-- Lapis kedua: cabut hak INSERT/DELETE di level tabel (termasuk payments dari v4).
+revoke insert, delete on public.orders, public.topups, public.payments from anon, authenticated;
+
+-- Catatan: baris top up `pending` yang sudah ada sebelum migration ini bisa saja dibuat
+-- manual lewat API. Periksa dulu sebelum menyetujui, mis.:
+--   select t.*, p.email from public.topups t join public.profiles p on p.id = t.user_id
+--    where t.status = 'pending' order by t.id desc;
 
 notify pgrst, 'reload schema';

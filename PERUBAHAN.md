@@ -16,7 +16,8 @@ Buka **Supabase → SQL Editor**, jalankan berurutan (sekali saja, kalau belum p
 
 4. `supabase/migration_v5.sql` — **baru (keamanan)**, konfirmasi pembayaran QRIS jadi atomik
    (saldo/pesanan tidak bisa dobel), pengguna tidak bisa lagi mengubah kolom `saldo` sendiri,
-   dan pembelian pakai saldo tidak bisa membuat saldo minus. **Wajib dijalankan bersamaan
+   pembelian pakai saldo tidak bisa membuat saldo minus, dan pengguna tidak bisa lagi membuat
+   baris `orders` / `topups` / `payments` sendiri lewat API. **Wajib dijalankan bersamaan
    dengan deploy kode terbaru** (`api/check-payment.js` sekarang memanggil RPC `settle_payment`).
 
 Kalau database masih baru (belum pernah dipakai sama sekali), jalankan urutan lengkap:
@@ -32,6 +33,10 @@ ada lagi 10 produk contoh) — semua produk & kategori 100% diisi manual lewat D
   kontak di profilnya. Sebelumnya siapa pun bisa mengubah saldonya sendiri lewat API.
 - **Beli pakai saldo:** pengecekan & pemotongan saldo digabung dalam satu UPDATE, jadi dua
   pembelian bersamaan tidak bisa membuat saldo minus. Ditambah constraint `saldo >= 0`.
+- **Tidak ada lagi baris palsu:** policy INSERT klien di `orders` dan `topups` dihapus, dan hak
+  INSERT/DELETE ke `orders`, `topups`, `payments` dicabut dari pengguna. Pesanan & top up hanya
+  dibuat oleh fungsi server. Top up `pending` lama sebaiknya dicek dulu sebelum disetujui
+  (query contoh ada di akhir `migration_v5.sql`).
 
 ## 8. Nominal unik QRIS dibuat di server
 - Sebelumnya browser membuat kode unik 1–99 sendiri dan menulis langsung ke tabel `payments`,
