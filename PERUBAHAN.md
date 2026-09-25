@@ -24,6 +24,16 @@ Kalau database masih baru (belum pernah dipakai sama sekali), jalankan urutan le
 `schema.sql` → `migration_v2.sql` → `migration_v3.sql` → `migration_v4.sql` → `migration_v5.sql`. **`seed.sql` sekarang kosong** (tidak
 ada lagi 10 produk contoh) — semua produk & kategori 100% diisi manual lewat Dashboard Admin.
 
+## 10. Peningkatan pengalaman pengguna (tanpa migration)
+- **Notifikasi toast** untuk aksi berhasil (simpan pengaturan, tambah ke keranjang, pembelian
+  berhasil, salin ID/nominal, aksi admin) — tidak lagi menggeser isi halaman.
+- **Skeleton loading** di Dashboard, Produk, Pesanan Saya, Riwayat Top Up, dan Dashboard Admin.
+- **QRIS:** hitung mundur masa berlaku (60 menit) + tombol salin nominal.
+- **Riwayat top up** (10 terakhir) di halaman Top Up Saldo.
+- **Pesanan Saya:** pencarian (ID / nama produk / kategori) + filter status dengan jumlah.
+- **Dialog konfirmasi** menggantikan `confirm()` bawaan browser saat admin menghapus produk/kategori.
+- Judul tab mengikuti halaman aktif, favicon baru, dan `@types/qrcode` (type check bersih).
+
 ## 9. Saldo tidak bisa dobel atau dimanipulasi
 - **Konfirmasi QRIS atomik:** `api/check-payment.js` sekarang memanggil RPC `settle_payment` yang
   mengunci baris payment, mengklaim transaksi GoBiz, menambah saldo (atau membuat pesanan), dan

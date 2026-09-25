@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, uploadFile, type Row } from './lib/supabase'
-import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, type IconName } from './ui'
+import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from './ui'
+import { useConfirm, useToast } from './feedback'
 
 const MUTED = { color: '#94a3b8' }
 const FIELD = 'input input-sm'
@@ -50,7 +51,9 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState<number | null>(null)
   const [err, setErr] = useState('')
-  const [ok, setOk] = useState('')
+  const toast = useToast()
+  const ask = useConfirm()
+  const [loaded, setLoaded] = useState(false)
   const [emailSearch, setEmailSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
   const [newCategory, setNewCategory] = useState('')
@@ -67,15 +70,15 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         api('categories?select=*&order=sort,id'),
       ])
       setD({ orders, products, topups, users, categories }); setErr('')
-    } catch (e) { setErr((e as Error).message) }
+    } catch (e) { setErr((e as Error).message) } finally { setLoaded(true) }
   }, [])
   useEffect(() => { load() }, [load])
 
   const run = async (fn: () => Promise<unknown>, msg?: string) => {
     try {
       await fn(); await load(); onChanged(); setErr('')
-      if (msg) { setOk(msg); setTimeout(() => setOk(''), 3000) }
-    } catch (e) { setErr((e as Error).message); setOk('') }
+      if (msg) toast(msg)
+    } catch (e) { setErr((e as Error).message) }
   }
   const who = (uid: string) => d.users.find(u => u.id === uid)?.email ?? uid.slice(0, 8)
   const pending = d.orders.filter(o => o.status === 'pending').length + d.topups.filter(t => t.status === 'pending').length
@@ -92,8 +95,8 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const copyOrderId = async (id: number) => {
     try {
       await navigator.clipboard.writeText(`ORD-${id}`)
-      setOk('ID pesanan disalin: ORD-' + id); setTimeout(() => setOk(''), 2000)
-    } catch { setErr('Gagal menyalin ID pesanan') }
+      toast('ID pesanan disalin: ORD-' + id)
+    } catch { toast('Gagal menyalin ID pesanan', 'error') }
   }
 
   const oq = orderSearch.trim().toLowerCase()
@@ -136,7 +139,10 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
     await api('categories', { method: 'POST', body: { name, sort: d.categories.length } })
     setNewCategory('')
   }, 'Kategori ditambahkan')
-  const removeCategory = (c: Row) => confirm(`Hapus kategori "${c.name}"?`) && run(() => api(`categories?id=eq.${c.id}`, { method: 'DELETE' }))
+  const removeCategory = async (c: Row) => {
+    if (await ask({ title: `Hapus kategori "${c.name}"?`, description: 'Produk di kategori ini tidak ikut terhapus.', confirmLabel: 'Hapus', danger: true }))
+      run(() => api(`categories?id=eq.${c.id}`, { method: 'DELETE' }), 'Kategori dihapus')
+  }
 
   const saveAccountData = (o: Row) => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: { account_data: orderNotes[o.id] ?? o.account_data ?? '' } }), 'Data akun disimpan')
 
@@ -161,10 +167,11 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
           ))}
         </div>
       </div>
-      {ok && <div className="alert alert-success"><Icon name="circleCheck" size={16} className="mt-0.5" /><span>{ok}</span></div>}
       {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{err}</span></div>}
 
-      {tab === 'ringkasan' && (
+      {!loaded && <div className="card overflow-hidden"><SkeletonRows rows={4} /></div>}
+
+      {loaded && tab === 'ringkasan' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           {([['users', 'Pengguna', d.users.length], ['clipboard', 'Pesanan', d.orders.length], ['clock', 'Menunggu', pending], ['wallet', 'Pendapatan', formatRp(revenue)]] as [IconName, string, string | number][]).map(([ic, label, val]) => (
             <div key={label} className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
@@ -178,7 +185,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
-      {tab === 'pesanan' && (
+      {loaded && tab === 'pesanan' && (
         <div className="space-y-4">
           <div className="card p-4 sm:p-5 space-y-2">
             <Field label="Cari ID pesanan (mis. ORD-12 atau 12), nama produk, atau email pembeli">
@@ -236,7 +243,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
-      {tab === 'produk' && (
+      {loaded && tab === 'produk' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4 items-start">
             <div className="card p-4 sm:p-5 space-y-4">
@@ -322,7 +329,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                       {p.active ? 'Aktif' : 'Nonaktif'}
                     </button>
                     <Btn onClick={() => startEdit(p)} variant="secondary"><Icon name="edit" size={14} /></Btn>
-                    <Btn onClick={() => confirm(`Hapus ${p.name}?`) && run(() => api(`products?id=eq.${p.id}`, { method: 'DELETE' }))} variant="danger"><Icon name="trash" size={14} /></Btn>
+                    <Btn onClick={async () => { if (await ask({ title: `Hapus ${p.name}?`, description: 'Produk akan dihapus permanen dari katalog.', confirmLabel: 'Hapus', danger: true })) run(() => api(`products?id=eq.${p.id}`, { method: 'DELETE' }), 'Produk dihapus') }} variant="danger"><Icon name="trash" size={14} /></Btn>
                   </div>
                 </div>
               ))}
@@ -331,7 +338,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
-      {tab === 'pengguna' && (() => {
+      {loaded && tab === 'pengguna' && (() => {
         const q = emailSearch.trim().toLowerCase()
         const filtered = q ? d.users.filter(u => (u.email ?? '').toLowerCase().includes(q)) : d.users
         return (
@@ -364,7 +371,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         )
       })()}
 
-      {tab === 'topup' && (
+      {loaded && tab === 'topup' && (
         <div className="card overflow-hidden">
           {d.topups.length === 0 ? <EmptyState icon="wallet" title="Belum ada permintaan top up." /> : (
             <div className="divide-y divide-white/[0.06]">
