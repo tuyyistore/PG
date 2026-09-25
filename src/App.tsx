@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ADMIN_EMAIL, api, configured, displayName, initSession, signInWithGoogle, signOut, uploadFile, type Row, type Session, type SessionUser } from './lib/supabase'
-import { Icon, TONE, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, type IconName } from './ui'
+import { Icon, TONE, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, SkeletonCard, type IconName } from './ui'
+import { useToast } from './feedback'
 import AdminPage from './Admin'
 import { buildDynamicQris } from './lib/qris'
 import logoFlip from './assets/payments/flip.svg'
@@ -66,7 +67,25 @@ interface Order {
 
 // ─── QRIS Modal ───────────────────────────────────────────────────────────────
 
-function QRISModal({ total, paymentId, onClose, onDone }: { total: number; paymentId: number; onClose: () => void; onDone: () => void }) {
+function useCountdown(until?: number) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!until) return
+    const iv = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(iv)
+  }, [until])
+  if (!until) return null
+  const left = Math.max(0, Math.floor((until - now) / 1000))
+  return { left, label: `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}` }
+}
+
+function QRISModal({ total, paymentId, expiresAt, onClose, onDone }: { total: number; paymentId: number; expiresAt?: number; onClose: () => void; onDone: () => void }) {
+  const toast = useToast()
+  const countdown = useCountdown(expiresAt)
+  const copyAmount = async () => {
+    try { await navigator.clipboard.writeText(String(total)); toast('Nominal disalin: ' + formatRp(total)) }
+    catch { toast('Gagal menyalin nominal', 'error') }
+  }
   const [done, setDone] = useState(false)
   const [qrUrl, setQrUrl] = useState('')
   const [warn, setWarn] = useState('')
@@ -130,7 +149,16 @@ function QRISModal({ total, paymentId, onClose, onDone }: { total: number; payme
         <div className="p-5 space-y-4">
           <div className="text-center">
             <p className="eyebrow">Total pembayaran (nominal unik)</p>
-            <p className="text-[28px] leading-9 font-semibold text-white tracking-tight tabular mt-1">{formatRp(total)}</p>
+            <div className="flex items-center justify-center gap-2 mt-1">
+              <p className="text-[28px] leading-9 font-semibold text-white tracking-tight tabular">{formatRp(total)}</p>
+              <button onClick={copyAmount} className="btn btn-ghost btn-icon btn-sm" aria-label="Salin nominal" title="Salin nominal"><Icon name="copy" size={16} /></button>
+            </div>
+            {countdown && (
+              <p className={`text-xs mt-1 tabular flex items-center justify-center gap-1.5 ${countdown.left < 300 ? 'text-[#fbbf24]' : 'text-muted-foreground'}`}>
+                <Icon name="clock" size={13} />
+                {countdown.left > 0 ? <>Berlaku <span className="font-medium">{countdown.label}</span> lagi</> : 'QRIS sudah kedaluwarsa'}
+              </p>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-5 flex flex-col items-center justify-center min-h-[232px]">
@@ -408,7 +436,7 @@ function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileAction, onS
 
 // ─── Stat Card — compact horizontal, monochrome icon ──────────────────────────
 
-function StatCard({ icon, label, value, tone }: { icon: IconName; label: string; value: string; tone: 'success' | 'warning' | 'danger' }) {
+function StatCard({ icon, label, value, tone, loading }: { icon: IconName; label: string; value: string; tone: 'success' | 'warning' | 'danger'; loading?: boolean }) {
   const dot = { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444' }[tone]
   return (
     <div className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
@@ -417,7 +445,7 @@ function StatCard({ icon, label, value, tone }: { icon: IconName; label: string;
         <p className="text-[13px] text-muted-foreground flex items-center gap-2 truncate">
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dot }} />{label}
         </p>
-        <p className="text-xl font-semibold text-white tracking-tight tabular mt-0.5">{value}</p>
+        {loading ? <div className="skeleton h-6 w-10 rounded-md mt-1" /> : <p className="text-xl font-semibold text-white tracking-tight tabular mt-0.5">{value}</p>}
       </div>
     </div>
   )
@@ -452,7 +480,7 @@ function OrderRow({ o, onDetail, showMeta }: { o: Order; onDetail: (o: Order) =>
 
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 
-function DashboardPage({ orders, saldo, onNav, onDetail }: { orders: Order[]; saldo: number; onNav: (p: string) => void; onDetail: (o: Order) => void }) {
+function DashboardPage({ orders, saldo, onNav, onDetail, loading }: { orders: Order[]; saldo: number; onNav: (p: string) => void; onDetail: (o: Order) => void; loading?: boolean }) {
   const dibeli = orders.filter(o => o.status === 'aktif').length
   const pendingOrders = orders.filter(o => o.status === 'pending').length
   const dibatalkan = orders.filter(o => o.status === 'nonaktif').length
@@ -476,7 +504,7 @@ function DashboardPage({ orders, saldo, onNav, onDetail }: { orders: Order[]; sa
           <div className="icon-tile" style={{ width: 48, height: 48, borderRadius: 14 }}><Icon name="wallet" size={20} /></div>
           <div className="min-w-0">
             <p className="text-[13px] text-muted-foreground">Saldo tersedia</p>
-            <p className="text-[28px] sm:text-[32px] leading-tight font-semibold text-white tracking-tight tabular truncate">{formatRp(saldo)}</p>
+            {loading ? <div className="skeleton h-9 w-48 rounded-lg mt-1" /> : <p className="text-[28px] sm:text-[32px] leading-tight font-semibold text-white tracking-tight tabular truncate">{formatRp(saldo)}</p>}
           </div>
         </div>
         <button onClick={() => onNav('saldo')} className="btn btn-secondary hidden sm:inline-flex sm:self-center">
@@ -486,9 +514,9 @@ function DashboardPage({ orders, saldo, onNav, onDetail }: { orders: Order[]; sa
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <StatCard icon="circleCheck" tone="success" label="Total Produk Dibeli" value={String(dibeli)} />
-        <StatCard icon="clock" tone="warning" label="Total Produk Pending" value={String(pendingOrders)} />
-        <StatCard icon="circleX" tone="danger" label="Total Produk Dibatalkan" value={String(dibatalkan)} />
+        <StatCard icon="circleCheck" tone="success" label="Total Produk Dibeli" loading={loading} value={String(dibeli)} />
+        <StatCard icon="clock" tone="warning" label="Total Produk Pending" loading={loading} value={String(pendingOrders)} />
+        <StatCard icon="circleX" tone="danger" label="Total Produk Dibatalkan" loading={loading} value={String(dibatalkan)} />
       </div>
 
       {/* Produk Saya */}
@@ -496,14 +524,14 @@ function DashboardPage({ orders, saldo, onNav, onDetail }: { orders: Order[]; sa
         <div className="flex items-center justify-between px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div>
             <h2 className="section-title">Produk Saya</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{orders.length} pesanan</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{loading ? 'Memuat…' : `${orders.length} pesanan`}</p>
           </div>
           <button onClick={() => onNav('pesanan')} className="btn btn-ghost btn-sm -mr-2">
             Lihat Semua <Icon name="chevronRight" size={14} />
           </button>
         </div>
 
-        {orders.length === 0 ? (
+        {loading ? <SkeletonRows rows={3} /> : orders.length === 0 ? (
           <EmptyState icon="server" title="Belum ada server untuk ditampilkan" description="Produk yang kamu beli akan muncul di sini."
             action={<button onClick={() => onNav('produk')} className="btn btn-primary btn-sm"><Icon name="plus" size={14} /> Beli Produk</button>} />
         ) : (
@@ -594,7 +622,7 @@ function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => void; inCa
 
 // ─── Produk Page ──────────────────────────────────────────────────────────────
 
-function ProdukPage({ cart, onAdd, products, categories }: { cart: CartItem[]; onAdd: (p: Product) => void; products: Product[]; categories: string[] }) {
+function ProdukPage({ cart, onAdd, products, categories, loading }: { cart: CartItem[]; onAdd: (p: Product) => void; products: Product[]; categories: string[]; loading?: boolean }) {
   const [tab, setTab] = useState('Semua')
   // Tab kategori diambil langsung dari kategori yang dibuat admin di database,
   // jadi kategori baru otomatis muncul di sini tanpa perlu ubah kode.
@@ -612,7 +640,9 @@ function ProdukPage({ cart, onAdd, products, categories }: { cart: CartItem[]; o
           ))}
         </div>
       </div>
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">{[0, 1, 2, 3].map(i => <SkeletonCard key={i} height={82} />)}</div>
+      ) : filtered.length === 0 ? (
         <div className="card"><EmptyState icon="package" title="Belum ada produk." description="Produk di kategori ini akan tampil di sini." /></div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
@@ -627,31 +657,58 @@ function ProdukPage({ cart, onAdd, products, categories }: { cart: CartItem[]; o
 
 // ─── Pesanan Page ─────────────────────────────────────────────────────────────
 
-function PesananPage({ orders, onDetail }: { orders: Order[]; onDetail: (o: Order) => void }) {
+const ORDER_FILTERS: { id: 'semua' | Order['status']; label: string }[] = [
+  { id: 'semua', label: 'Semua' }, { id: 'aktif', label: 'Aktif' }, { id: 'pending', label: 'Pending' }, { id: 'nonaktif', label: 'Nonaktif' },
+]
+
+function PesananPage({ orders, onDetail, loading }: { orders: Order[]; onDetail: (o: Order) => void; loading?: boolean }) {
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState<(typeof ORDER_FILTERS)[number]['id']>('semua')
+  const query = q.trim().toLowerCase()
+  const filtered = orders.filter(o =>
+    (status === 'semua' || o.status === status) &&
+    (!query || o.id.toLowerCase().includes(query) || o.product.name.toLowerCase().includes(query) || (o.product.category ?? '').toLowerCase().includes(query))
+  )
+  const count = (id: string) => id === 'semua' ? orders.length : orders.filter(o => o.status === id).length
+
   return (
     <div className="space-y-6">
       <PageHeader title="Pesanan Saya" subtitle="Riwayat semua pesanan dan status layananmu." />
+
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
+          <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+            {ORDER_FILTERS.map(f => (
+              <button key={f.id} onClick={() => setStatus(f.id)} className={`chip gap-2 ${status === f.id ? 'chip-active' : ''}`}>
+                {f.label}<span className="text-[11px] tabular text-subtle">{count(f.id)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="relative sm:w-72">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground"><Icon name="search" size={16} /></span>
+          <input className="input" style={{ paddingLeft: 40 }} placeholder="Cari ID atau nama produk" value={q} onChange={e => setQ(e.target.value)} aria-label="Cari pesanan" />
+        </div>
+      </div>
+
       <div className="card overflow-hidden">
-        {orders.length === 0 ? (
+        {loading ? <SkeletonRows rows={4} /> : orders.length === 0 ? (
           <EmptyState icon="clipboard" title="Belum ada pesanan untuk ditampilkan" description="Pesanan yang kamu buat akan muncul di sini." />
+        ) : filtered.length === 0 ? (
+          <EmptyState icon="search" title="Tidak ada pesanan yang cocok" description="Coba kata kunci atau filter status lain."
+            action={<button onClick={() => { setQ(''); setStatus('semua') }} className="btn btn-secondary btn-sm">Reset filter</button>} />
         ) : (
-          <>
-            <div className="px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <h2 className="section-title">Semua pesanan</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">{orders.length} pesanan</p>
-            </div>
-            <div className="divide-y divide-white/[0.06]">
-              {orders.map(o => (
-                <div key={o.id}>
-                  <OrderRow o={o} onDetail={onDetail} showMeta />
-                  <div className="sm:hidden flex justify-between items-center px-4 pb-3.5 -mt-1 pl-[68px]">
-                    <span className="text-xs text-muted-foreground">{o.product.category}</span>
-                    <span className="text-sm font-medium text-white tabular">{formatRp(o.product.price)}<span className="text-xs text-muted-foreground font-normal">{o.product.period}</span></span>
-                  </div>
+          <div className="divide-y divide-white/[0.06]">
+            {filtered.map(o => (
+              <div key={o.id}>
+                <OrderRow o={o} onDetail={onDetail} showMeta />
+                <div className="sm:hidden flex justify-between items-center px-4 pb-3.5 -mt-1 pl-[68px]">
+                  <span className="text-xs text-muted-foreground">{o.product.category}</span>
+                  <span className="text-sm font-medium text-white tabular">{formatRp(o.product.price)}<span className="text-xs text-muted-foreground font-normal">{o.product.period}</span></span>
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -660,10 +717,14 @@ function PesananPage({ orders, onDetail }: { orders: Order[]; onDetail: (o: Orde
 
 // ─── Saldo Page ───────────────────────────────────────────────────────────────
 
-function SaldoPage({ saldo, onPaid }: { saldo: number; onPaid: () => void }) {
+function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: () => void; userId: string }) {
+  const [history, setHistory] = useState<Row[] | null>(null)
+  const loadHistory = () => api(`topups?select=id,amount,status,created_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
+  useEffect(() => { loadHistory() }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [nominal, setNominal] = useState<number | null>(null)
   const [custom, setCustom] = useState('')
-  const [payment, setPayment] = useState<{ id: number; amount: number } | null>(null)
+  const [payment, setPayment] = useState<{ id: number; amount: number; expiresAt?: number } | null>(null)
   const presets = [10000, 25000, 50000, 100000, 250000, 500000]
   const finalNominal = nominal ?? Number(custom.replace(/\D/g, ''))
 
@@ -677,7 +738,7 @@ function SaldoPage({ saldo, onPaid }: { saldo: number; onPaid: () => void }) {
     setCreating(true); setPayErr('')
     try {
       const row = await api<Row>('rpc/create_topup_payment', { method: 'POST', body: { base_amount: finalNominal } })
-      setPayment({ id: Number(row.id), amount: Number(row.amount) })
+      setPayment({ id: Number(row.id), amount: Number(row.amount), expiresAt: row.created_at ? new Date(row.created_at).getTime() + 60 * 60 * 1000 : undefined })
     } catch (e) { setPayErr((e as Error).message || 'Gagal membuat pembayaran. Coba lagi.') } finally { setCreating(false) }
   }
 
@@ -761,9 +822,37 @@ function SaldoPage({ saldo, onPaid }: { saldo: number; onPaid: () => void }) {
         </div>
       </div>
 
+      <div className="card overflow-hidden">
+        <div className="px-4 sm:px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h2 className="section-title">Riwayat top up</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">10 transaksi terakhir</p>
+          </div>
+          <button onClick={loadHistory} className="btn btn-ghost btn-icon btn-sm -mr-2" aria-label="Muat ulang riwayat"><Icon name="refresh" size={16} /></button>
+        </div>
+        {history === null ? <SkeletonRows rows={2} thumb={36} /> : history.length === 0 ? (
+          <EmptyState icon="wallet" title="Belum ada top up" description="Top up yang berhasil akan tercatat di sini." />
+        ) : (
+          <div className="divide-y divide-white/[0.06]">
+            {history.map(t => (
+              <div key={t.id} className="flex items-center gap-4 px-4 sm:px-5 py-3.5">
+                <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="wallet" size={16} /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white tabular">+ {formatRp(t.amount)}</p>
+                  <p className="text-xs text-muted-foreground tabular">
+                    {new Date(t.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <StatusBadge status={t.status} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {payment && (
-        <QRISModal total={payment.amount} paymentId={payment.id} onClose={() => setPayment(null)}
-          onDone={() => { onPaid(); setPayment(null); setNominal(null); setCustom('') }} />
+        <QRISModal total={payment.amount} paymentId={payment.id} expiresAt={payment.expiresAt} onClose={() => setPayment(null)}
+          onDone={() => { onPaid(); loadHistory(); setPayment(null); setNominal(null); setCustom('') }} />
       )}
     </div>
   )
@@ -898,16 +987,15 @@ function ProfilePage({ user, isAdmin, profile, onSaved }: { user: SessionUser; i
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? '')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [msg, setMsg] = useState('')
+  const toast = useToast()
   const [err, setErr] = useState('')
 
   async function save() {
-    setSaving(true); setErr(''); setMsg('')
+    setSaving(true); setErr('')
     try {
       await api(`profiles?id=eq.${user.id}`, { method: 'PATCH', body: { full_name: name.trim() || null, whatsapp: whatsapp.trim() || null, contact_email: contactEmail.trim() || null, avatar_url: avatarUrl || null } })
       onSaved({ full_name: name.trim(), whatsapp: whatsapp.trim(), contact_email: contactEmail.trim(), avatar_url: avatarUrl })
-      setMsg('Pengaturan berhasil disimpan')
-      setTimeout(() => setMsg(''), 3000)
+      toast('Pengaturan berhasil disimpan')
     } catch (e) { setErr((e as Error).message) } finally { setSaving(false) }
   }
 
@@ -927,7 +1015,6 @@ function ProfilePage({ user, isAdmin, profile, onSaved }: { user: SessionUser; i
     <div className="space-y-6 max-w-3xl">
       <PageHeader title="Pengaturan" subtitle="Kelola profil dan data kontak untuk pembelian." />
 
-      {msg && <div className="alert alert-success"><Icon name="circleCheck" size={16} className="mt-0.5" /><span>{msg}</span></div>}
       {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{err}</span></div>}
 
       {/* Profile section */}
@@ -1028,9 +1115,13 @@ export default function App() {
   const [profile, setProfile] = useState<Row | null>(null)
   const [notice, setNotice] = useState('')
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
+  const [catalogLoaded, setCatalogLoaded] = useState(false)
+  const [mineLoaded, setMineLoaded] = useState(false)
 
   const isAdmin = session?.user.email?.toLowerCase() === ADMIN_EMAIL
+  useEffect(() => { document.title = session ? `${PAGE_TITLES[page] ?? 'Dashboard'} · ${BRAND_NAME}` : `Masuk · ${BRAND_NAME}` }, [page, session])
   const fail = (e: unknown) => setNotice((e as Error).message)
+  const toast = useToast()
 
   // Navigasi berbasis history API: setiap pindah halaman didorong ke riwayat browser
   // supaya tombol/gestur "kembali" berpindah antar-menu di dalam app, bukan keluar ke login.
@@ -1064,12 +1155,12 @@ export default function App() {
       setCategories(rows.map((c: Row) => c.name))
     } catch (e) { fail(e) }
   }
-  async function refreshCatalog() { await Promise.all([loadProducts(), loadCategories()]) }
+  async function refreshCatalog() { await Promise.all([loadProducts(), loadCategories()]); setCatalogLoaded(true) }
   async function loadMine(uid: string) {
     try {
       const [o, p] = await Promise.all([api(`orders?select=*&user_id=eq.${uid}&order=id.desc`), api(`profiles?select=*&id=eq.${uid}`)])
       setOrders(o.map(rowToOrder)); setSaldo(Number(p[0]?.saldo ?? 0)); setProfile(p[0] ?? null); setNotice('')
-    } catch (e) { fail(e) }
+    } catch (e) { fail(e) } finally { setMineLoaded(true) }
   }
 
   useEffect(() => {
@@ -1083,12 +1174,14 @@ export default function App() {
 
   function addToCart(p: Product) {
     setCart(prev => prev.find(i => i.product.id === p.id) ? prev : [...prev, { product: p, qty: 1 }])
+    toast(`${p.name} ditambahkan ke keranjang`)
   }
 
   // Order/topup sudah ditulis backend (api/check-payment.js) begitu pembayaran GoBiz terdeteksi cocok —
   // di sini tinggal muat ulang data terbaru dari Supabase.
   async function handleCheckoutDone() {
     setCart([])
+    toast('Pembelian berhasil. Pesanan sudah aktif di Produk Saya.')
     try { await loadMine(session!.user.id) } catch (e) { fail(e) }
     navigate('dashboard')
   }
@@ -1144,10 +1237,10 @@ export default function App() {
       <main className="lg:pl-64 pt-16">
         <div key={page} className={`page-enter max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 ${cart.length > 0 && page !== 'checkout' ? 'pb-36' : 'pb-24'}`}>
         {notice && <div className="alert alert-danger mb-6"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{notice}</span></div>}
-        {page === 'dashboard' && <DashboardPage orders={orders} saldo={saldo} onNav={p => navigate(p)} onDetail={setDetailOrder} />}
-        {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} />}
-        {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} />}
-        {page === 'saldo'     && <SaldoPage saldo={saldo} onPaid={handlePaid} />}
+        {page === 'dashboard' && <DashboardPage orders={orders} saldo={saldo} onNav={p => navigate(p)} onDetail={setDetailOrder} loading={!mineLoaded} />}
+        {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} loading={!catalogLoaded} />}
+        {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} loading={!mineLoaded} />}
+        {page === 'saldo'     && <SaldoPage saldo={saldo} onPaid={handlePaid} userId={session.user.id} />}
         {page === 'checkout'  && <CheckoutPage cart={cart} saldo={saldo} profile={profile} onBack={() => navigate('produk')}
           onBoughtWithSaldo={handleCheckoutDone} onGoTopUp={() => navigate('saldo')} />}
         {page === 'profile'   && <ProfilePage user={session.user} isAdmin={isAdmin} profile={profile} onSaved={patch => setProfile(pr => ({ ...(pr ?? {}), ...patch }))} />}

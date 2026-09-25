@@ -55,12 +55,12 @@ export const ICON_PATHS = {
 
 export type IconName = keyof typeof ICON_PATHS
 
-export function Icon({ name, size = 20, strokeWidth = 1.75, className }: { name: IconName; size?: number; strokeWidth?: number; className?: string }) {
+export function Icon({ name, size = 20, strokeWidth = 1.75, className, style }: { name: IconName; size?: number; strokeWidth?: number; className?: string; style?: React.CSSProperties }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
-      className={className} aria-hidden="true" style={{ flexShrink: 0 }}
+      className={className} aria-hidden="true" style={{ flexShrink: 0, ...style }}
     >
       {ICON_PATHS[name]}
     </svg>
@@ -140,4 +140,26 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
 export function StatusBadge({ status }: { status: string }) {
   const s = STATUS_MAP[status] ?? { label: status, cls: 'badge-neutral' }
   return <span className={`badge badge-dot ${s.cls}`}>{s.label}</span>
+}
+
+// Placeholder saat data dimuat
+export function SkeletonRows({ rows = 3, thumb = 40 }: { rows?: number; thumb?: number }) {
+  return (
+    <div className="divide-y divide-white/[0.06]" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-4 sm:px-5 py-4">
+          <div className="skeleton flex-shrink-0" style={{ width: thumb, height: thumb, borderRadius: 12 }} />
+          <div className="flex-1 space-y-2">
+            <div className="skeleton h-3.5 rounded-md" style={{ width: `${55 - i * 8}%` }} />
+            <div className="skeleton h-3 rounded-md w-1/3" />
+          </div>
+          <div className="skeleton h-7 w-20 rounded-full" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function SkeletonCard({ height = 80 }: { height?: number }) {
+  return <div className="card skeleton" style={{ height }} aria-hidden="true" />
 }
