@@ -1,0 +1,10 @@
+{
+  "description": "This modern e-commerce platform offers a responsive design with dynamic product displays, intuitive navigation, and a seamless checkout experience for users.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

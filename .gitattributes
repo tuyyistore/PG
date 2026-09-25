@@ -1,0 +1,3 @@
+# Normalisasi line ending. Git LFS sengaja dinonaktifkan agar gambar/aset
+# tidak menjadi file pointer saat dibuild di Vercel.
+* text=auto

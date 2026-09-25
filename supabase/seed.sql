@@ -1,0 +1,4 @@
+-- Tidak ada lagi data produk contoh/bawaan yang otomatis diisi.
+-- Semua produk 100% dikelola manual oleh admin lewat Dashboard Admin → tab Produk,
+-- begitu juga kategori lewat Dashboard Admin → tab Produk → Kelola Kategori.
+-- File ini sengaja dikosongkan (tidak ada perintah INSERT produk contoh lagi).
