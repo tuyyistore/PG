@@ -1,3 +1,4 @@
+import type React from 'react'
 
 // ─── Icons (inline SVG, gaya Lucide — tanpa dependensi tambahan) ──────────────
 
@@ -37,11 +38,24 @@ export const ICON_PATHS = {
   image: <><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></>,
   tag: <><path d="M12.6 2H4a2 2 0 0 0-2 2v8.6a2 2 0 0 0 .59 1.41l8.6 8.6a2 2 0 0 0 2.82 0l8-8a2 2 0 0 0 0-2.82l-8.6-8.6A2 2 0 0 0 12.6 2Z" /><circle cx="7.5" cy="7.5" r="1.5" /></>,
   upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" /></>,
+  menu: <path d="M4 6h16M4 12h16M4 18h10" />,
+  chevronRight: <path d="m9 18 6-6-6-6" />,
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>,
+  copy: <><rect width="13" height="13" x="9" y="9" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
+  user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></>,
+  arrowUpRight: <path d="M7 17 17 7M7 7h10v10" />,
+  clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  circleX: <><circle cx="12" cy="12" r="9" /><path d="m15 9-6 6M9 9l6 6" /></>,
+  headset: <><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h3zM3 16a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H3z" /><path d="M19 18v1a3 3 0 0 1-3 3h-3" /></>,
+  lock: <><rect width="16" height="10" x="4" y="11" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
+  info: <><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></>,
+  sparkle: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />,
 } as const
 
 export type IconName = keyof typeof ICON_PATHS
 
-export function Icon({ name, size = 20, strokeWidth = 2, className }: { name: IconName; size?: number; strokeWidth?: number; className?: string }) {
+export function Icon({ name, size = 20, strokeWidth = 1.75, className }: { name: IconName; size?: number; strokeWidth?: number; className?: string }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -72,10 +86,58 @@ export const toneKey = (bg: string) => Object.keys(TONE).find(k => TONE[k as key
 export function ProductThumb({ url, size = 40, iconSize, className = '' }: { url?: string | null; size?: number; iconSize?: number; className?: string }) {
   return (
     <div
-      className={`rounded-xl flex items-center justify-center text-white flex-shrink-0 overflow-hidden ${className}`}
-      style={{ width: size, height: size, background: url ? '#0b0d18' : '#2a3154' }}
+      className={`flex items-center justify-center flex-shrink-0 overflow-hidden text-slate-400 ${className}`}
+      style={{
+        width: size, height: size,
+        borderRadius: Math.max(8, Math.round(size * 0.28)),
+        background: url ? '#0b1220' : 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}
     >
       {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : <Icon name="package" size={iconSize ?? Math.round(size * 0.45)} />}
     </div>
   )
+}
+
+// ─── Shared presentational primitives ─────────────────────────────────────────
+
+export function PageHeader({ title, subtitle, actions, leading }: { title: string; subtitle?: string; actions?: React.ReactNode; leading?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex items-center gap-3 min-w-0">
+        {leading}
+        <div className="min-w-0">
+          <h1 className="page-title truncate">{title}</h1>
+          {subtitle && <p className="page-subtitle">{subtitle}</p>}
+        </div>
+      </div>
+      {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+    </div>
+  )
+}
+
+export function EmptyState({ icon = 'package', title, description, action }: { icon?: IconName; title: string; description?: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center py-12 px-6">
+      <div className="icon-tile mb-4" style={{ width: 48, height: 48, borderRadius: 14 }}><Icon name={icon} size={22} /></div>
+      <p className="text-sm font-medium text-white">{title}</p>
+      {description && <p className="hint mt-1 max-w-xs">{description}</p>}
+      {action && <div className="mt-5">{action}</div>}
+    </div>
+  )
+}
+
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  aktif: { label: 'Aktif', cls: 'badge-success' },
+  pending: { label: 'Pending', cls: 'badge-warning' },
+  nonaktif: { label: 'Nonaktif', cls: 'badge-danger' },
+  paid: { label: 'Dibayar', cls: 'badge-success' },
+  approved: { label: 'Disetujui', cls: 'badge-success' },
+  rejected: { label: 'Ditolak', cls: 'badge-danger' },
+  expired: { label: 'Kedaluwarsa', cls: 'badge-neutral' },
+}
+
+export function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_MAP[status] ?? { label: status, cls: 'badge-neutral' }
+  return <span className={`badge badge-dot ${s.cls}`}>{s.label}</span>
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ADMIN_EMAIL, api, configured, displayName, initSession, signInWithGoogle, signOut, uploadFile, type Row, type Session, type SessionUser } from './lib/supabase'
-import { Icon, TONE, formatRp, ProductThumb, type IconName } from './ui'
+import { Icon, TONE, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, type IconName } from './ui'
 import AdminPage from './Admin'
 import { buildDynamicQris } from './lib/qris'
 import logoFlip from './assets/payments/flip.svg'
@@ -25,18 +25,9 @@ const PAYMENT_LOGOS: { name: string; src: string }[] = [
   { name: 'Flip', src: logoFlip },
 ]
 
-// ─── Design Tokens (matched from panelbot.id reference) ───────────────────────
-// bg-page:   #0b0d18  (very dark navy-black)
-// bg-card:   #171d36  (slightly lighter navy)
-// bg-card2:  #0f1220  (darker card variant)
-// border:    #2a3154  (subtle)
-// text:      #ffffff
-// muted:     #8f9bbd
-// blue:      #3d7ef5
-// blue-icon-bg: #172050
-// green-icon-bg: #0f3320  green: #22c55e
-// gold-icon-bg:  #2d2008  gold:  #d4a830
-// cyan-icon-bg:  #0c2a30  cyan:  #22d3ee
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+// Semua token warna/spacing/radius didefinisikan di src/index.css (:root + @theme)
+// dan dipakai lewat kelas komponen (.card, .btn, .input, .badge, dst).
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -108,87 +99,110 @@ function QRISModal({ total, paymentId, onClose, onDone }: { total: number; payme
 
   if (done) {
     return (
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#03040a]/95 p-4">
-        <div className="w-full max-w-sm rounded-2xl p-8 text-center" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-          <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-5 text-white"><Icon name="check" size={30} strokeWidth={3} /></div>
-          <p className="text-xs tracking-widest uppercase mb-2" style={{ color: '#22c55e' }}>Pembayaran Berhasil</p>
-          <h3 className="font-display font-800 text-xl text-white mb-3">Terima Kasih!</h3>
-          <p className="text-xs mb-6 leading-relaxed" style={{ color: '#8f9bbd' }}>Detail layanan dikirim ke WhatsApp & Email dalam 5 menit.</p>
-          <button onClick={onDone} className="w-full text-white font-display font-700 text-xs tracking-widest uppercase py-3.5 rounded-xl transition-colors" style={{ background: '#3d7ef5' }}>
-            Kembali ke Dashboard
-          </button>
+      <div className="overlay">
+        <div className="dialog p-6 sm:p-8 text-center">
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-5" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.25)' }}>
+            <Icon name="check" size={24} strokeWidth={2.25} />
+          </div>
+          <span className="badge badge-success mb-3">Pembayaran berhasil</span>
+          <h3 className="text-lg font-semibold text-white tracking-tight mb-2">Terima kasih</h3>
+          <p className="hint mb-6">Detail layanan dikirim ke WhatsApp &amp; Email dalam 5 menit.</p>
+          <button onClick={onDone} className="btn btn-primary btn-lg btn-block">Kembali ke Dashboard</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#03040a]/95 p-4">
-      <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-700 text-white text-sm">Bayar dengan QRIS</h3>
-          <button onClick={onClose} style={{ color: '#8f9bbd' }} className="w-8 h-8 rounded-full flex items-center justify-center hover:text-white transition-colors" aria-label="Tutup"><Icon name="x" size={18} /></button>
-        </div>
-
-        <div className="bg-white rounded-xl p-5 mb-4 flex flex-col items-center min-h-[210px] justify-center">
-          {qrUrl ? (
-            <img src={qrUrl} alt="QRIS" width={180} height={180} className="rounded" />
-          ) : (
-            <p className="text-[11px] text-center px-4" style={{ color: '#64748b' }}>QRIS statis belum diatur (VITE_QRIS_STATIC_STRING).</p>
-          )}
-          <div className="flex items-center gap-1 mt-3">
-            <div className="w-4 h-4 rounded-full bg-red-500" />
-            <div className="w-4 h-4 rounded-full bg-blue-500 -ml-1.5" />
-            <span className="text-[10px] font-bold text-black ml-1 tracking-wider">QRIS</span>
+    <div className="overlay">
+      <div className="dialog">
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-3">
+            <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="qr" size={18} /></div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">Bayar dengan QRIS</h3>
+              <p className="text-xs text-muted-foreground">Pembayaran terverifikasi otomatis</p>
+            </div>
           </div>
+          <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm" aria-label="Tutup"><Icon name="x" size={18} /></button>
         </div>
 
-        <div className="rounded-xl p-3.5 mb-4 text-center" style={{ background: '#0b0d18' }}>
-          <p className="text-[10px] uppercase tracking-widest mb-1" style={{ color: '#8f9bbd' }}>Total Pembayaran (nominal unik)</p>
-          <p className="font-display font-800 text-2xl text-white">{formatRp(total)}</p>
-          <p className="text-[10px] mt-1" style={{ color: '#f59e0b' }}>Bayar persis sesuai nominal ini ya, termasuk 2 digit terakhir</p>
-        </div>
+        <div className="p-5 space-y-4">
+          <div className="text-center">
+            <p className="eyebrow">Total pembayaran (nominal unik)</p>
+            <p className="text-[28px] leading-9 font-semibold text-white tracking-tight tabular mt-1">{formatRp(total)}</p>
+          </div>
 
-        <p className="text-[11px] text-center mb-4 leading-relaxed" style={{ color: '#8f9bbd' }}>
-          Scan via GoPay · OVO · Dana · BCA · Mandiri
-        </p>
+          <div className="bg-white rounded-2xl p-5 flex flex-col items-center justify-center min-h-[232px]">
+            {qrUrl ? (
+              <img src={qrUrl} alt="QRIS" width={196} height={196} className="rounded-md" />
+            ) : (
+              <p className="text-xs text-center px-4 text-slate-500">QRIS statis belum diatur (VITE_QRIS_STATIC_STRING).</p>
+            )}
+            <img src={logoQris} alt="QRIS" className="h-4 mt-4 object-contain" />
+          </div>
 
-        {warn && <p className="text-[11px] text-center mb-3" style={{ color: '#f87171' }}>{warn}</p>}
+          <div className="alert alert-warning">
+            <Icon name="info" size={16} className="mt-0.5" />
+            <span>Bayar persis sesuai nominal ini ya, termasuk 2 digit terakhir.</span>
+          </div>
 
-        <div className="w-full text-white font-display font-700 text-xs tracking-widest uppercase py-3.5 rounded-xl flex items-center justify-center gap-2" style={{ background: '#2f3860' }}>
-          <span className="w-3.5 h-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-          Menunggu Pembayaran Otomatis...
+          <p className="hint text-center">Scan via GoPay · OVO · Dana · BCA · Mandiri</p>
+
+          {warn && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{warn}</span></div>}
+
+          <div className="h-12 rounded-[14px] flex items-center justify-center gap-2.5 text-sm font-medium text-slate-300" style={{ background: '#121a2b', border: '1px solid #2a3448' }}>
+            <span className="w-4 h-4 rounded-full border-2 border-slate-600 border-t-[#4f7cff] animate-spin" />
+            Menunggu pembayaran otomatis…
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Sidebar Drawer ───────────────────────────────────────────────────────────
+// ─── Brand ────────────────────────────────────────────────────────────────────
+
+// Ganti nama brand di sini bila perlu.
+const BRAND_NAME = 'panelbot'
+
+function BrandMark({ size = 28 }: { size?: number }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-center text-white font-bold tracking-tight" style={{ width: size, height: size, borderRadius: 8, background: '#4f7cff', fontSize: size * 0.46 }}>
+        pb
+      </div>
+      <span className="text-[15px] font-semibold text-white tracking-tight">{BRAND_NAME}</span>
+    </div>
+  )
+}
 
 // ─── Auth UI & mapper data ────────────────────────────────────────────────────
 
 function Avatar({ user, size }: { user: SessionUser; size: number }) {
   const url = user.user_metadata?.avatar_url || user.user_metadata?.picture
   return url
-    ? <img src={url} alt="" referrerPolicy="no-referrer" className="rounded-full object-cover flex-shrink-0" style={{ width: size, height: size }} />
-    : <div className="rounded-full flex items-center justify-center font-display font-800 text-white flex-shrink-0" style={{ width: size, height: size, background: TONE.blue, fontSize: size * 0.42 }}>{displayName(user).charAt(0).toUpperCase()}</div>
+    ? <img src={url} alt="" referrerPolicy="no-referrer" className="rounded-full object-cover flex-shrink-0" style={{ width: size, height: size, boxShadow: '0 0 0 1px rgba(255,255,255,0.08)' }} />
+    : <div className="rounded-full flex items-center justify-center font-semibold text-slate-200 flex-shrink-0" style={{ width: size, height: size, background: '#26314b', fontSize: size * 0.4, boxShadow: '0 0 0 1px rgba(255,255,255,0.08)' }}>{displayName(user).charAt(0).toUpperCase()}</div>
 }
 
 function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#0b0d18' }}>
-      <div className="w-full max-w-sm rounded-2xl p-6 text-center" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <span className="font-display font-800 text-4xl" style={{ color: '#3d7ef5' }}>p<span style={{ color: '#60a5fa' }}>b</span></span>
-        <h1 className="font-display font-800 text-xl text-white mt-4 mb-1">Masuk ke Akun</h1>
-        <p className="text-xs mb-6 leading-relaxed" style={{ color: '#8f9bbd' }}>Lanjutkan dengan akun Google. Admin masuk dengan email Google yang terdaftar sebagai admin.</p>
-        <button onClick={signInWithGoogle} disabled={!configured}
-          className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl font-display font-700 text-sm transition hover:brightness-95 disabled:cursor-not-allowed"
-          style={{ background: configured ? '#ffffff' : '#2f3860', color: configured ? '#1f2937' : '#8f9bbd' }}>
-          <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" /><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" /><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" /><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" /></svg>
-          Lanjutkan dengan Google
-        </button>
-        {!configured && <p className="text-[11px] mt-4 leading-relaxed" style={{ color: '#fbbf24' }}>Database belum dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di Environment Variables Vercel.</p>}
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-background">
+      <div className="w-full max-w-[400px]">
+        <div className="flex justify-center mb-8"><BrandMark size={32} /></div>
+        <div className="card p-6 sm:p-8">
+          <h1 className="text-xl font-semibold text-white tracking-tight">Masuk ke akun</h1>
+          <p className="hint mt-2 mb-6">Lanjutkan dengan akun Google. Admin masuk dengan email Google yang terdaftar sebagai admin.</p>
+          <button onClick={signInWithGoogle} disabled={!configured}
+            className="btn btn-lg btn-block"
+            style={{ background: configured ? '#ffffff' : '#1f2940', color: configured ? '#0f172a' : '#94a3b8', opacity: 1 }}>
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" /><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" /><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" /><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" /></svg>
+            Lanjutkan dengan Google
+          </button>
+          {!configured && <div className="alert alert-warning mt-4"><Icon name="info" size={16} className="mt-0.5" /><span>Database belum dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di Environment Variables Vercel.</span></div>}
+        </div>
+        <p className="hint text-center mt-6 flex items-center justify-center gap-1.5"><Icon name="lock" size={13} /> Login aman melalui Google OAuth</p>
       </div>
     </div>
   )
@@ -214,27 +228,34 @@ const rowToOrder = (r: Row): Order => ({
 
 function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#03040a]/90 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl p-5 space-y-4" style={{ background: '#171d36', border: '1px solid #2a3154' }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex items-center gap-3 min-w-0">
-            <ProductThumb url={order.product.logoUrl} size={40} iconSize={20} />
-            <div className="min-w-0"><p className="font-display font-700 text-white text-sm truncate">{order.product.name}</p><p className="text-[10px]" style={{ color: '#8f9bbd' }}>{order.id} · {order.date}</p></div>
+            <ProductThumb url={order.product.logoUrl} size={40} iconSize={18} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{order.product.name}</p>
+              <p className="text-xs text-muted-foreground tabular">{order.id} · {order.date}</p>
+            </div>
           </div>
-          <button onClick={onClose} style={{ color: '#8f9bbd' }} className="w-8 h-8 rounded-full flex items-center justify-center hover:text-white transition-colors flex-shrink-0" aria-label="Tutup"><Icon name="x" size={16} /></button>
+          <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm flex-shrink-0" aria-label="Tutup"><Icon name="x" size={18} /></button>
         </div>
-        <div className="rounded-xl p-3.5" style={{ background: '#0b0d18', border: '1px solid #2a3154' }}>
-          <p className="text-[10px] uppercase tracking-widest mb-2" style={{ color: '#8f9bbd' }}>Data Akun / Informasi Penting</p>
-          {order.accountData ? (
-            <p className="text-xs text-white whitespace-pre-wrap leading-relaxed">{order.accountData}</p>
-          ) : (
-            <p className="text-xs" style={{ color: '#8f9bbd' }}>Belum ada data yang dikirim admin untuk pesanan ini. Silakan hubungi support jika perlu.</p>
-          )}
+        <div className="p-5">
+          <p className="label">Data akun / informasi penting</p>
+          <div className="card-inset p-4">
+            {order.accountData ? (
+              <p className="text-[13px] text-slate-100 whitespace-pre-wrap leading-relaxed font-mono break-words">{order.accountData}</p>
+            ) : (
+              <p className="hint">Belum ada data yang dikirim admin untuk pesanan ini. Silakan hubungi support jika perlu.</p>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdmin, onLogout }: {
   open: boolean; onClose: () => void; activePage: string; onNav: (p: string) => void
@@ -252,41 +273,53 @@ function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdmin, onL
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-30 bg-[#03040a]/90" onClick={onClose} />}
+      {open && <div className="fixed inset-0 z-30 bg-[#050810]/70 backdrop-blur-[2px] lg:hidden" style={{ animation: 'fade-in 200ms' }} onClick={onClose} />}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 z-40 flex flex-col transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}
-        style={{ background: '#0f1220', borderRight: '1px solid #2a3154' }}
+        className={`fixed top-0 left-0 h-full w-[264px] lg:w-64 z-40 flex flex-col bg-sidebar transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
-        {/* User info */}
-        <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: '1px solid #2a3154' }}>
-          <Avatar user={shownUser} size={40} />
-          <div className="min-w-0">
-            <p className="font-display font-700 text-white text-sm truncate">{shownName}</p>
-            <p className="text-[10px] truncate" style={{ color: '#8f9bbd' }}>{user.email}</p>
-          </div>
+        <div className="h-16 flex items-center justify-between px-5">
+          <BrandMark />
+          <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm lg:hidden" aria-label="Tutup menu"><Icon name="x" size={18} /></button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {items.map(item => (
-            <button
-              key={item.id}
-              onClick={() => { onNav(item.id); onClose() }}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-left transition-all"
-              style={{
-                background: activePage === item.id ? '#1f3a80' : '#0f1220',
-                color: activePage === item.id ? '#ffffff' : '#8f9bbd',
-              }}
-            >
-              <Icon name={item.icon} size={19} />
-              <span className="font-display font-600">{item.label}</span>
-              {activePage === item.id && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: '#3d7ef5' }} />}
+        <nav className="flex-1 overflow-y-auto px-3 py-2">
+          <p className="px-3 pb-2 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-subtle">Menu</p>
+          <div className="space-y-1">
+            {items.map(item => {
+              const active = activePage === item.id
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { onNav(item.id); onClose() }}
+                  className={`nav-item ${active ? 'nav-item-active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <Icon name={item.icon} size={18} />
+                  <span>{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          <p className="px-3 pb-2 pt-6 text-[11px] font-medium uppercase tracking-[0.08em] text-subtle">Akun</p>
+          <div className="space-y-1">
+            <button onClick={() => { onNav('profile'); onClose() }} className={`nav-item ${activePage === 'profile' ? 'nav-item-active' : ''}`}>
+              <Icon name="settings" size={18} /><span>Pengaturan</span>
             </button>
-          ))}
+          </div>
         </nav>
 
-        <div className="px-3 pb-5" style={{ borderTop: '1px solid #2a3154', paddingTop: '12px' }}>
-          <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-colors" style={{ color: '#ef4444' }}>
-            <Icon name="logout" size={19} /><span className="font-display font-600">Logout</span>
+        <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl">
+            <Avatar user={shownUser} size={36} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white truncate">{shownName}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            </div>
+          </div>
+          <button onClick={onLogout} className="nav-item mt-1 hover:!text-[#f87171]">
+            <Icon name="logout" size={18} /><span>Logout</span>
           </button>
         </div>
       </aside>
@@ -294,89 +327,75 @@ function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdmin, onL
   )
 }
 
-// ─── Header — matches panelbot exactly ───────────────────────────────────────
+// ─── Header ───────────────────────────────────────────────────────────────────
 
-function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileAction, onSettingsClick }: {
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: 'Dashboard', produk: 'Produk', pesanan: 'Pesanan Saya', saldo: 'Top Up Saldo',
+  checkout: 'Checkout', profile: 'Pengaturan', admin: 'Dashboard Admin',
+}
+
+function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileAction, onSettingsClick, user, profile, page }: {
   onMenuOpen: () => void
   onProfileClick: (e: React.MouseEvent) => void
   showDropdown: boolean
   onProfileAction: (a: string) => void
   onSettingsClick: () => void
+  user: SessionUser
+  profile: Row | null
+  page: string
 }) {
+  const shownUser: SessionUser = profile?.avatar_url ? { ...user, user_metadata: { ...user.user_metadata, avatar_url: profile.avatar_url } } : user
+  const shownName = profile?.full_name || displayName(user)
+  const menu: { action: string; label: string; icon: IconName }[] = [
+    { action: 'My Profile', label: 'Profil Saya', icon: 'user' },
+    { action: 'Settings', label: 'Pengaturan', icon: 'settings' },
+    { action: 'Logout', label: 'Logout', icon: 'logout' },
+  ]
+
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-20 h-14 flex items-center px-4 justify-between"
-      style={{ background: '#0b0d18' }}
+      className="fixed top-0 left-0 right-0 lg:left-64 z-20 h-16 flex items-center px-4 sm:px-6 lg:px-8 justify-between bg-background/85 backdrop-blur-md"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
     >
-      {/* Hamburger — 3 lines exactly like reference */}
-      <button
-        onClick={onMenuOpen}
-        className="flex flex-col justify-center gap-[5px] w-9 h-9 items-start"
-      >
-        <span className="block w-[22px] h-[2px] rounded-full bg-white" />
-        <span className="block w-[16px] h-[2px] rounded-full bg-white" />
-        <span className="block w-[22px] h-[2px] rounded-full bg-white" />
-      </button>
-
-      {/* Logo center — "pb" wordmark style */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
-        <span className="font-display font-800 text-2xl tracking-tight" style={{ color: '#3d7ef5' }}>
-          p<span style={{ color: '#60a5fa' }}>b</span>
-        </span>
+      <div className="flex items-center gap-3 min-w-0">
+        <button onClick={onMenuOpen} className="btn btn-ghost btn-icon -ml-2 lg:hidden" aria-label="Buka menu">
+          <Icon name="menu" size={20} />
+        </button>
+        <div className="lg:hidden"><BrandMark size={26} /></div>
+        <div className="hidden lg:flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Workspace</span>
+          <Icon name="chevronRight" size={14} className="text-subtle" />
+          <span className="text-white font-medium">{PAGE_TITLES[page] ?? 'Dashboard'}</span>
+        </div>
       </div>
 
-      {/* Right icons */}
-      <div className="flex items-center gap-2">
-        {/* Settings gear */}
-        <button
-          onClick={onSettingsClick}
-          aria-label="Pengaturan"
-          className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:brightness-125"
-          style={{ background: '#2a3154' }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
+      <div className="flex items-center gap-1.5">
+        <button onClick={onSettingsClick} aria-label="Pengaturan" className="btn btn-ghost btn-icon">
+          <Icon name="settings" size={18} />
         </button>
 
-        {/* Avatar + dropdown */}
         <div className="relative">
-          <button
-            onClick={onProfileClick}
-            className="relative w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: '#2a2f45' }}
-          >
-            {/* person icon */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#9ca3af">
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-            </svg>
-            {/* online dot */}
-            <span
-              className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full"
-              style={{ background: '#22c55e', border: '2px solid #0b0d18' }}
-            />
+          <button onClick={onProfileClick} className="flex items-center gap-2 h-10 pl-1 pr-1 sm:pr-2.5 rounded-[14px] transition-colors duration-200 hover:bg-white/[0.04]" aria-haspopup="menu" aria-expanded={showDropdown}>
+            <span className="relative">
+              <Avatar user={shownUser} size={30} />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e', border: '2px solid #0b1220' }} />
+            </span>
+            <span className="hidden sm:block text-sm font-medium text-white max-w-[140px] truncate">{shownName}</span>
+            <Icon name="chevronDown" size={14} className="hidden sm:block text-muted-foreground" />
           </button>
 
           {showDropdown && (
-            <div
-              className="absolute right-0 top-11 w-44 rounded-xl overflow-hidden shadow-2xl"
-              style={{ background: '#171d36', border: '1px solid #2a3154' }}
-            >
-              {['My Profile', 'Settings', 'Logout'].map((a, i) => (
-                <button
-                  key={a}
-                  onClick={() => onProfileAction(a)}
-                  className="w-full text-left px-5 py-3.5 text-sm font-display font-500 transition-colors"
-                  style={{
-                    color: a === 'Logout' ? '#ef4444' : '#ffffff',
-                    borderTop: i > 0 ? '1px solid #2a3154' : 'none',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#2a3154')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#171d36')}
-                >
-                  {a}
+            <div className="absolute right-0 top-12 w-56 rounded-2xl p-1.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]" role="menu"
+              style={{ background: '#1a2235', border: '1px solid rgba(255,255,255,0.08)', animation: 'dialog-in 200ms' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="px-3 py-2.5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <p className="text-sm font-medium text-white truncate">{shownName}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
+              {menu.map(m => (
+                <button key={m.action} onClick={() => onProfileAction(m.action)} role="menuitem"
+                  className={`w-full flex items-center gap-2.5 px-3 h-9 rounded-[10px] text-sm text-left transition-colors duration-200 ${m.action === 'Logout' ? 'text-[#f87171] hover:bg-[#ef4444]/10' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white'}`}>
+                  <Icon name={m.icon} size={16} /> {m.label}
                 </button>
               ))}
             </div>
@@ -387,32 +406,46 @@ function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileAction, onS
   )
 }
 
-// ─── Stat Card — full width, icon left, label above value ─────────────────────
+// ─── Stat Card — compact horizontal, monochrome icon ──────────────────────────
 
-function StatCard({ iconBg, iconColor, iconSvg, label, value, large }: {
-  iconBg: string; iconColor: string; iconSvg: React.ReactNode
-  label: string; value: string; large?: boolean
-}) {
+function StatCard({ icon, label, value, tone }: { icon: IconName; label: string; value: string; tone: 'success' | 'warning' | 'danger' }) {
+  const dot = { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444' }[tone]
   return (
-    <div
-      className="flex items-center gap-4 rounded-2xl px-4 py-4 w-full"
-      style={{ background: '#171d36', border: '1px solid #2a3154' }}
-    >
-      <div
-        className="flex-shrink-0 w-14 h-14 rounded-2xl flex items-center justify-center"
-        style={{ background: iconBg }}
-      >
-        <span style={{ color: iconColor }}>{iconSvg}</span>
-      </div>
-      <div>
-        <p className="text-sm mb-1" style={{ color: '#8f9bbd' }}>{label}</p>
-        <p
-          className="font-display font-800 leading-none text-white"
-          style={{ fontSize: large ? '28px' : '26px' }}
-        >
-          {value}
+    <div className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
+      <div className="icon-tile"><Icon name={icon} size={18} /></div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] text-muted-foreground flex items-center gap-2 truncate">
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dot }} />{label}
         </p>
+        <p className="text-xl font-semibold text-white tracking-tight tabular mt-0.5">{value}</p>
       </div>
+    </div>
+  )
+}
+
+// ─── Order row (dipakai Dashboard & Pesanan) ──────────────────────────────────
+
+function OrderRow({ o, onDetail, showMeta }: { o: Order; onDetail: (o: Order) => void; showMeta?: boolean }) {
+  return (
+    <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 transition-colors duration-200 hover:bg-white/[0.02]">
+      <ProductThumb url={o.product.logoUrl} size={40} iconSize={18} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white truncate">{o.product.name}</p>
+        <p className="text-xs text-muted-foreground tabular truncate mt-0.5">{o.id} · {o.date}{showMeta && o.product.category && <span className="hidden sm:inline"> · {o.product.category}</span>}</p>
+      </div>
+      {showMeta && (
+        <p className="hidden sm:block text-sm font-medium text-white tabular whitespace-nowrap">
+          {formatRp(o.product.price)}<span className="text-muted-foreground font-normal">{o.product.period}</span>
+        </p>
+      )}
+      <div className="hidden md:block w-24 text-right"><StatusBadge status={o.status} /></div>
+      {o.status === 'aktif' ? (
+        <button onClick={() => onDetail(o)} className="btn btn-secondary btn-sm flex-shrink-0">
+          <Icon name="eye" size={14} /> <span><span className="hidden sm:inline">Lihat </span>Detail</span>
+        </button>
+      ) : (
+        <span className="md:hidden flex-shrink-0"><StatusBadge status={o.status} /></span>
+      )}
     </div>
   )
 }
@@ -425,62 +458,57 @@ function DashboardPage({ orders, saldo, onNav, onDetail }: { orders: Order[]; sa
   const dibatalkan = orders.filter(o => o.status === 'nonaktif').length
 
   return (
-    <div className="space-y-3.5">
-      <h1 className="font-display font-800 text-2xl text-white pt-1">Dashboard</h1>
+    <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Ringkasan saldo dan aktivitas pembelianmu."
+        actions={
+          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto">
+            <button onClick={() => onNav('saldo')} className="btn btn-secondary"><Icon name="wallet" size={16} /> Top Up</button>
+            <button onClick={() => onNav('produk')} className="btn btn-primary"><Icon name="plus" size={16} strokeWidth={2} /> Beli Produk</button>
+          </div>
+        }
+      />
 
-      {/* Quick actions — ditaruh di atas, tepat di bawah judul Dashboard */}
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => onNav('produk')} className="py-4 rounded-2xl font-display font-700 text-xs tracking-widest uppercase text-white transition hover:brightness-110 flex items-center justify-center gap-2" style={{ background: '#3d7ef5' }}>
-          <Icon name="plus" size={16} strokeWidth={2.5} /> Beli Produk
-        </button>
-        <button onClick={() => onNav('saldo')} className="py-4 rounded-2xl font-display font-700 text-xs tracking-widest uppercase text-white transition hover:brightness-125 flex items-center justify-center gap-2" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-          <Icon name="wallet" size={16} /> Top Up
+      {/* Balance */}
+      <div className="card p-5 sm:p-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="icon-tile" style={{ width: 48, height: 48, borderRadius: 14 }}><Icon name="wallet" size={20} /></div>
+          <div className="min-w-0">
+            <p className="text-[13px] text-muted-foreground">Saldo tersedia</p>
+            <p className="text-[28px] sm:text-[32px] leading-tight font-semibold text-white tracking-tight tabular truncate">{formatRp(saldo)}</p>
+          </div>
+        </div>
+        <button onClick={() => onNav('saldo')} className="btn btn-secondary hidden sm:inline-flex sm:self-center">
+          Isi saldo <Icon name="arrowUpRight" size={15} />
         </button>
       </div>
 
-      <StatCard iconBg={TONE.green} iconColor="#ffffff" iconSvg={<Icon name="circleCheck" size={26} />} label="Total Produk Dibeli" value={String(dibeli)} />
-      <StatCard iconBg={TONE.gold} iconColor="#ffffff" iconSvg={<Icon name="refresh" size={26} />} label="Total Produk Pending" value={String(pendingOrders)} />
-      <StatCard iconBg={TONE.pink} iconColor="#ffffff" iconSvg={<Icon name="x" size={26} />} label="Total Produk Dibatalkan" value={String(dibatalkan)} />
-      <StatCard iconBg={TONE.purple} iconColor="#ffffff" iconSvg={<Icon name="wallet" size={26} />} label="Saldo" value={formatRp(saldo)} large />
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <StatCard icon="circleCheck" tone="success" label="Total Produk Dibeli" value={String(dibeli)} />
+        <StatCard icon="clock" tone="warning" label="Total Produk Pending" value={String(pendingOrders)} />
+        <StatCard icon="circleX" tone="danger" label="Total Produk Dibatalkan" value={String(dibatalkan)} />
+      </div>
 
-      {/* Produk Saya card */}
-      <div className="rounded-2xl p-4 w-full" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-700 text-white text-base">Produk Saya</h2>
-          <button onClick={() => onNav('pesanan')} className="text-[11px] font-display font-600 tracking-widest uppercase" style={{ color: '#3d7ef5' }}>
-            Lihat Semua
+      {/* Produk Saya */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h2 className="section-title">Produk Saya</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{orders.length} pesanan</p>
+          </div>
+          <button onClick={() => onNav('pesanan')} className="btn btn-ghost btn-sm -mr-2">
+            Lihat Semua <Icon name="chevronRight" size={14} />
           </button>
         </div>
 
         {orders.length === 0 ? (
-          <div className="py-12 flex flex-col items-center gap-3" style={{ color: '#3a4a6a' }}>
-            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ border: '2px solid #2a3154' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </div>
-            <p className="text-sm">Belum ada server untuk ditampilkan</p>
-          </div>
+          <EmptyState icon="server" title="Belum ada server untuk ditampilkan" description="Produk yang kamu beli akan muncul di sini."
+            action={<button onClick={() => onNav('produk')} className="btn btn-primary btn-sm"><Icon name="plus" size={14} /> Beli Produk</button>} />
         ) : (
-          <div className="space-y-2.5">
-            {orders.map(o => (
-              <div key={o.id} className="flex items-center gap-3 rounded-xl px-3 py-3" style={{ background: '#0b0d18' }}>
-                <ProductThumb url={o.product.logoUrl} size={36} iconSize={18} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-600 text-white text-xs truncate">{o.product.name}</p>
-                  <p className="text-[10px]" style={{ color: '#8f9bbd' }}>{o.id} · {o.date}</p>
-                </div>
-                {o.status === 'aktif' ? (
-                  <button onClick={() => onDetail(o)}
-                    className="text-[10px] font-display font-700 px-2.5 py-1 rounded-full flex-shrink-0 flex items-center gap-1 transition hover:brightness-110"
-                    style={{ background: '#0f3320', color: '#22c55e' }}>
-                    <Icon name="eye" size={11} /> Lihat Detail
-                  </button>
-                ) : (
-                  <span className="text-[10px] font-display font-700 px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: '#2a3154', color: '#8f9bbd' }}>{o.status}</span>
-                )}
-              </div>
-            ))}
+          <div className="divide-y divide-white/[0.06]">
+            {orders.map(o => <OrderRow key={o.id} o={o} onDetail={onDetail} />)}
           </div>
         )}
       </div>
@@ -490,7 +518,7 @@ function DashboardPage({ orders, saldo, onNav, onDetail }: { orders: Order[]; sa
 
 // ─── Support Button (buka live chat Chaport) ──────────────────────────────────
 
-function SupportButton() {
+function SupportButton({ raised }: { raised?: boolean }) {
   const openChat = () => {
     const w = window as unknown as { chaport?: { q: (...args: unknown[]) => void } }
     w.chaport?.q('open')
@@ -499,16 +527,11 @@ function SupportButton() {
     <button
       onClick={openChat}
       aria-label="Live Chat Support"
-      className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition hover:brightness-110 active:scale-95"
-      style={{ background: TONE.blue, boxShadow: '0 8px 24px rgba(61,126,245,0.45)' }}
+      title="Live Chat Support"
+      className={`fixed right-4 sm:right-6 z-[25] w-12 h-12 rounded-full flex items-center justify-center text-white transition-all duration-200 hover:bg-[#5e89ff] active:scale-95 ${raised ? 'bottom-28' : 'bottom-6'}`}
+      style={{ background: '#4f7cff', boxShadow: '0 8px 20px -6px rgba(0,0,0,0.5)' }}
     >
-      <img
-        src="https://img.icons8.com/ios-filled/50/FFFFFF/customer-support.png"
-        alt=""
-        width={26}
-        height={26}
-        style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.15))' }}
-      />
+      <Icon name="headset" size={20} />
     </button>
   )
 }
@@ -520,48 +543,48 @@ function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => void; inCa
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
-      style={{ background: '#171d36', border: `1px solid ${p.popular ? '#2a4a8a' : '#2a3154'}` }}
+      className="card card-interactive overflow-hidden"
+      style={p.popular ? { borderColor: 'rgba(79,124,255,0.35)' } : undefined}
     >
-      <div className="flex items-center gap-3 px-4 py-4 cursor-pointer" onClick={() => setExpanded(e => !e)}>
-        <ProductThumb url={p.logoUrl} size={44} iconSize={22} />
+      <button type="button" className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left" onClick={() => setExpanded(e => !e)} aria-expanded={expanded}>
+        <ProductThumb url={p.logoUrl} size={48} iconSize={20} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-            <p className="font-display font-700 text-white text-sm">{p.name}</p>
-            {p.badge && (
-              <span className="text-[9px] font-display font-700 px-2 py-0.5 rounded-full flex-shrink-0"
-                style={p.popular ? { background: '#3d7ef5', color: '#fff' } : { background: '#2a3154', color: '#8f9bbd' }}>
-                {p.badge}
-              </span>
-            )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[15px] font-semibold text-white tracking-tight">{p.name}</p>
+            {p.badge && <span className={`badge ${p.popular ? 'badge-primary' : 'badge-neutral'}`}>{p.badge}</span>}
           </div>
-          <p className="text-[11px] truncate" style={{ color: '#8f9bbd' }}>{p.tagline}</p>
+          <p className="text-[13px] text-muted-foreground truncate mt-0.5">{p.tagline || p.category}</p>
         </div>
-        <div className="text-right flex-shrink-0 ml-2">
-          <p className="font-display font-800 text-white text-sm">{formatRp(p.price)}</p>
-          <p className="text-[10px]" style={{ color: '#8f9bbd' }}>{p.period}</p>
+        <div className="text-right flex-shrink-0">
+          <p className="text-[15px] font-semibold text-white tabular">{formatRp(p.price)}</p>
+          <p className="text-xs text-muted-foreground">{p.period}</p>
         </div>
-      </div>
+        <Icon name="chevronDown" size={16} className={`text-muted-foreground transition-transform duration-200 hidden sm:block ${expanded ? 'rotate-180' : ''}`} />
+      </button>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid #2a3154' }} className="px-4 py-3">
-          <ul className="grid grid-cols-2 gap-y-1.5 gap-x-3 mb-3">
-            {p.features.map(f => (
-              <li key={f} className="flex items-center gap-1.5 text-[11px]" style={{ color: '#8892a4' }}>
-                <span style={{ color: '#4d8dff' }}><Icon name="check" size={13} strokeWidth={3} /></span>{f}
-              </li>
-            ))}
-          </ul>
+        <div className="px-4 sm:px-5 pb-5 pt-4 page-enter" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {p.features.length > 0 && (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 mb-4">
+              {p.features.map(f => (
+                <li key={f} className="flex items-center gap-2 text-[13px] text-slate-300">
+                  <Icon name="check" size={14} strokeWidth={2.25} className="text-[#8fb0ff]" />{f}
+                </li>
+              ))}
+            </ul>
+          )}
           {p.originalPrice && (
-            <p className="text-[10px] mb-2 line-through" style={{ color: '#8f9bbd' }}>{formatRp(p.originalPrice)}{p.period}</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Harga normal <span className="line-through tabular">{formatRp(p.originalPrice)}{p.period}</span>
+            </p>
           )}
           <button
             onClick={onAdd}
             disabled={inCart}
-            className="w-full py-3 rounded-xl font-display font-700 text-xs tracking-widest uppercase text-white transition hover:brightness-110 disabled:cursor-default flex items-center justify-center gap-2"
-            style={{ background: inCart ? '#14532d' : '#3d7ef5', color: inCart ? '#4ade80' : '#fff' }}
+            className={`btn btn-block ${inCart ? '' : 'btn-primary'}`}
+            style={inCart ? { background: 'rgba(34,197,94,0.1)', color: '#4ade80', borderColor: 'rgba(34,197,94,0.2)', opacity: 1, cursor: 'default' } : undefined}
           >
-            {inCart ? <><Icon name="check" size={15} strokeWidth={3} /> Ditambahkan</> : <><Icon name="cart" size={15} /> Tambah ke Keranjang</>}
+            {inCart ? <><Icon name="check" size={16} strokeWidth={2.25} /> Ditambahkan</> : <><Icon name="cart" size={16} /> Tambah ke Keranjang</>}
           </button>
         </div>
       )}
@@ -580,25 +603,24 @@ function ProdukPage({ cart, onAdd, products, categories }: { cart: CartItem[]; o
   const cartIds = new Set(cart.map(i => i.product.id))
 
   return (
-    <div className="space-y-4">
-      <h1 className="font-display font-800 text-2xl text-white pt-1">Produk</h1>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className="flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-display font-700 tracking-widest uppercase transition-all"
-            style={tab === t
-              ? { background: '#3d7ef5', color: '#fff' }
-              : { background: '#171d36', color: '#8f9bbd', border: '1px solid #2a3154' }}>
-            {t}
-          </button>
-        ))}
+    <div className="space-y-6">
+      <PageHeader title="Produk" subtitle="Pilih layanan yang ingin kamu beli." />
+      <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
+        <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+          {tabs.map(t => (
+            <button key={t} onClick={() => setTab(t)} className={`chip ${tab === t ? 'chip-active' : ''}`}>{t}</button>
+          ))}
+        </div>
       </div>
-      <div className="space-y-2.5">
-        {filtered.length === 0 && <p className="text-xs text-center py-10" style={{ color: '#8f9bbd' }}>Belum ada produk.</p>}
-        {filtered.map(p => (
-          <ProductCard key={p.id} p={p} onAdd={() => onAdd(p)} inCart={cartIds.has(p.id)} />
-        ))}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="card"><EmptyState icon="package" title="Belum ada produk." description="Produk di kategori ini akan tampil di sini." /></div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
+          {filtered.map(p => (
+            <ProductCard key={p.id} p={p} onAdd={() => onAdd(p)} inCart={cartIds.has(p.id)} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -607,43 +629,31 @@ function ProdukPage({ cart, onAdd, products, categories }: { cart: CartItem[]; o
 
 function PesananPage({ orders, onDetail }: { orders: Order[]; onDetail: (o: Order) => void }) {
   return (
-    <div className="space-y-4">
-      <h1 className="font-display font-800 text-2xl text-white pt-1">Pesanan Saya</h1>
-      {orders.length === 0 ? (
-        <div className="rounded-2xl py-16 flex flex-col items-center gap-3" style={{ background: '#171d36', border: '1px solid #2a3154', color: '#8f9bbd' }}>
-          <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ border: '2px solid #2a3154' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><line x1="5" y1="12" x2="19" y2="12" /></svg>
-          </div>
-          <p className="text-sm">Belum ada pesanan untuk ditampilkan</p>
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {orders.map(o => (
-            <div key={o.id} className="rounded-2xl p-4" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-              <div className="flex items-center gap-3 mb-3">
-                <ProductThumb url={o.product.logoUrl} size={40} iconSize={20} />
-                <div className="flex-1">
-                  <p className="font-display font-700 text-white text-sm">{o.product.name}</p>
-                  <p className="text-[10px]" style={{ color: '#8f9bbd' }}>{o.id} · {o.date}</p>
-                </div>
-                {o.status === 'aktif' ? (
-                  <button onClick={() => onDetail(o)}
-                    className="text-[10px] font-display font-700 px-2.5 py-1 rounded-full flex items-center gap-1 transition hover:brightness-110"
-                    style={{ background: '#0f3320', color: '#22c55e' }}>
-                    <Icon name="eye" size={11} /> Lihat Detail
-                  </button>
-                ) : (
-                  <span className="text-[10px] font-display font-700 px-2.5 py-1 rounded-full" style={{ background: '#2a3154', color: '#8f9bbd' }}>{o.status}</span>
-                )}
-              </div>
-              <div className="flex justify-between items-center pt-3" style={{ borderTop: '1px solid #2a3154' }}>
-                <span className="text-xs" style={{ color: '#8f9bbd' }}>{o.product.category}</span>
-                <span className="font-display font-800 text-white text-sm">{formatRp(o.product.price)}<span className="text-xs font-400" style={{ color: '#8f9bbd' }}>{o.product.period}</span></span>
-              </div>
+    <div className="space-y-6">
+      <PageHeader title="Pesanan Saya" subtitle="Riwayat semua pesanan dan status layananmu." />
+      <div className="card overflow-hidden">
+        {orders.length === 0 ? (
+          <EmptyState icon="clipboard" title="Belum ada pesanan untuk ditampilkan" description="Pesanan yang kamu buat akan muncul di sini." />
+        ) : (
+          <>
+            <div className="px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <h2 className="section-title">Semua pesanan</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{orders.length} pesanan</p>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="divide-y divide-white/[0.06]">
+              {orders.map(o => (
+                <div key={o.id}>
+                  <OrderRow o={o} onDetail={onDetail} showMeta />
+                  <div className="sm:hidden flex justify-between items-center px-4 pb-3.5 -mt-1 pl-[68px]">
+                    <span className="text-xs text-muted-foreground">{o.product.category}</span>
+                    <span className="text-sm font-medium text-white tabular">{formatRp(o.product.price)}<span className="text-xs text-muted-foreground font-normal">{o.product.period}</span></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -667,72 +677,102 @@ function SaldoPage({ saldo, onPaid }: { saldo: number; onPaid: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="font-display font-800 text-2xl text-white pt-1">Top Up Saldo</h1>
+    <div className="space-y-6">
+      <PageHeader title="Top Up Saldo" subtitle="Isi saldo instan lewat QRIS — terverifikasi otomatis." />
 
-      <div className="rounded-2xl px-4 py-4" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white" style={{ background: TONE.purple }}>
-            <Icon name="wallet" size={26} />
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 lg:gap-6 items-start">
+        {/* Left column */}
+        <div className="space-y-4">
+          <div className="card p-5 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title">Pilih nominal</h2>
+              <span className="text-xs text-muted-foreground">Langkah 1 dari 2</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+              {presets.map(n => (
+                <button key={n} onClick={() => { setNominal(n); setCustom('') }}
+                  className={`option h-14 px-4 flex items-center justify-between text-left ${nominal === n ? 'option-active' : ''}`}>
+                  <span className="text-[15px] font-semibold tabular">{formatRp(n)}</span>
+                  <span className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors duration-200 ${nominal === n ? 'bg-[#4f7cff]' : ''}`} style={nominal === n ? undefined : { border: '1.5px solid #3a4760' }}>
+                    {nominal === n && <Icon name="check" size={10} strokeWidth={3} className="text-white" />}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-5">
+              <label className="label" htmlFor="custom-nominal">Nominal lainnya</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">Rp</span>
+                <input id="custom-nominal" value={custom} onChange={e => { setCustom(e.target.value); setNominal(null) }}
+                  placeholder="0" inputMode="numeric"
+                  className="input tabular" style={{ paddingLeft: 44 }} />
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm mb-1" style={{ color: '#8f9bbd' }}>Saldo Kamu</p>
-            <p className="font-display font-800 text-2xl text-white">{formatRp(saldo)}</p>
-            <p className="text-[10px] mt-1" style={{ color: '#8f9bbd' }}>Saldo bertambah setelah top up dikonfirmasi admin</p>
+
+          <div className="card p-5 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title">Metode pembayaran</h2>
+              <span className="text-xs text-muted-foreground">Langkah 2 dari 2</span>
+            </div>
+            <div className="option option-active px-4 py-3.5 flex items-center gap-4">
+              <div className="w-12 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 px-1.5">
+                <img src={logoQris} alt="QRIS" className="max-h-4 max-w-full object-contain" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white">QRIS</p>
+                <p className="text-xs text-muted-foreground truncate">E-wallet &amp; semua m-banking</p>
+              </div>
+              <span className="badge badge-primary">Otomatis</span>
+            </div>
+            <PaymentMethodsCard />
           </div>
         </div>
-      </div>
 
-      <div className="rounded-2xl p-4" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <p className="text-xs uppercase tracking-widest mb-3" style={{ color: '#8f9bbd' }}>Pilih Nominal</p>
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          {presets.map(n => (
-            <button key={n} onClick={() => { setNominal(n); setCustom('') }}
-              className="py-3 rounded-xl font-display font-700 text-xs transition-all"
-              style={nominal === n
-                ? { background: '#3d7ef5', color: '#fff' }
-                : { background: '#0b0d18', color: '#8f9bbd', border: '1px solid #2a3154' }}>
-              {formatRp(n)}
-            </button>
-          ))}
+        {/* Right column — summary */}
+        <div className="card p-5 sm:p-6 lg:sticky lg:top-24">
+          <h2 className="section-title mb-4">Ringkasan</h2>
+          <div className="card-inset p-4 mb-4">
+            <p className="text-xs text-muted-foreground">Saldo kamu</p>
+            <p className="text-2xl font-semibold text-white tracking-tight tabular mt-0.5">{formatRp(saldo)}</p>
+          </div>
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between"><dt className="text-muted-foreground">Nominal top up</dt><dd className="text-white tabular">{finalNominal > 0 ? formatRp(finalNominal) : '—'}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Metode</dt><dd className="text-white">QRIS</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Biaya layanan</dt><dd className="text-white">Gratis</dd></div>
+          </dl>
+          <div className="divider my-4" />
+          <div className="flex justify-between items-baseline mb-5">
+            <span className="text-sm text-muted-foreground">Total</span>
+            <span className="text-xl font-semibold text-white tabular">{finalNominal > 0 ? formatRp(finalNominal) : '—'}</span>
+          </div>
+          <button onClick={startPayment} disabled={finalNominal <= 0} className="btn btn-primary btn-lg btn-block">
+            <Icon name="qr" size={18} /> Bayar via QRIS · {finalNominal > 0 ? formatRp(finalNominal) : '—'}
+          </button>
+          <p className="hint mt-3 text-center">Nominal unik ditambahkan otomatis. Saldo bertambah setelah top up dikonfirmasi.</p>
         </div>
-        <label className="block text-[10px] uppercase tracking-widest mb-1.5" style={{ color: '#8f9bbd' }}>Nominal Lainnya</label>
-        <input value={custom} onChange={e => { setCustom(e.target.value); setNominal(null) }}
-          placeholder="Rp 0"
-          className="w-full text-white text-sm px-4 py-3 rounded-xl focus:outline-none transition-colors"
-          style={{ background: '#0b0d18', border: '1px solid #2a3154', color: '#fff' }} />
       </div>
-
-      <button onClick={startPayment} disabled={finalNominal <= 0}
-        className="w-full font-display font-800 text-sm tracking-widest uppercase py-4 rounded-2xl transition hover:brightness-110 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        style={{ background: finalNominal > 0 ? '#3d7ef5' : '#232a48', color: finalNominal > 0 ? '#ffffff' : '#8f9bbd' }}>
-        <Icon name="qr" size={18} /> Bayar via QRIS · {finalNominal > 0 ? formatRp(finalNominal) : '—'}
-      </button>
 
       {payment && (
         <QRISModal total={payment.amount} paymentId={payment.id} onClose={() => setPayment(null)}
           onDone={() => { onPaid(); setPayment(null); setNominal(null); setCustom('') }} />
       )}
-
-      <PaymentMethodsCard />
     </div>
   )
 }
 
 function PaymentMethodsCard() {
   return (
-    <div className="rounded-2xl p-4" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-      <p className="text-xs uppercase tracking-widest mb-3" style={{ color: '#8f9bbd' }}>Metode Pembayaran Didukung</p>
-      <div className="grid grid-cols-3 gap-2">
+    <div className="mt-5">
+      <p className="eyebrow mb-3">Didukung melalui QRIS</p>
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {PAYMENT_LOGOS.map(p => (
-          <div key={p.name} title={p.name}
-            className="flex items-center justify-center h-12 rounded-xl px-3"
-            style={{ background: '#0b0d18', border: '1px solid #2a3154' }}>
-            <img src={p.src} alt={p.name} className="max-h-5 max-w-full object-contain" />
+          <div key={p.name} title={p.name} className="flex items-center justify-center h-11 rounded-xl px-3 bg-white/[0.96]">
+            <img src={p.src} alt={p.name} className="max-h-[18px] max-w-full object-contain" />
           </div>
         ))}
       </div>
-      <p className="text-[10px] mt-3 leading-relaxed" style={{ color: '#8f9bbd' }}>Semua metode di atas diproses otomatis lewat QRIS — tinggal scan pakai e-wallet atau m-banking favoritmu.</p>
+      <p className="hint mt-3">Semua metode di atas diproses otomatis lewat QRIS — tinggal scan pakai e-wallet atau m-banking favoritmu.</p>
     </div>
   )
 }
@@ -754,75 +794,87 @@ function CheckoutPage({ cart, saldo, profile, onBack, onBoughtWithSaldo, onGoTop
   }
 
   return (
-    <div className="space-y-4 pb-6">
-      <div className="flex items-center gap-3 pt-1">
-        <button onClick={onBack} className="w-9 h-9 rounded-full flex items-center justify-center hover:text-white transition-colors" style={{ color: '#8f9bbd', background: '#171d36', border: '1px solid #2a3154' }} aria-label="Kembali"><Icon name="arrowLeft" size={18} /></button>
-        <h1 className="font-display font-800 text-2xl text-white">Checkout</h1>
-      </div>
+    <div className="space-y-6 pb-6">
+      <PageHeader title="Checkout" subtitle="Periksa pesananmu sebelum membayar."
+        leading={<button onClick={onBack} className="btn btn-secondary btn-icon flex-shrink-0" aria-label="Kembali"><Icon name="arrowLeft" size={18} /></button>} />
 
-      <div className="rounded-2xl p-4 space-y-3" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        {cart.map(i => (
-          <div key={i.product.id} className="flex items-center gap-3">
-            <ProductThumb url={i.product.logoUrl} size={36} iconSize={18} />
-            <div className="flex-1">
-              <p className="font-display font-600 text-white text-xs">{i.product.name}</p>
-              <p className="text-[10px]" style={{ color: '#8f9bbd' }}>{i.product.period}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 lg:gap-6 items-start">
+        <div className="space-y-4">
+          <div className="card overflow-hidden">
+            <div className="px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <h2 className="section-title">Item pesanan</h2>
             </div>
-            <p className="text-sm font-display font-800 text-white">{formatRp(i.product.price)}</p>
+            <div className="divide-y divide-white/[0.06]">
+              {cart.map(i => (
+                <div key={i.product.id} className="flex items-center gap-4 px-4 sm:px-5 py-4">
+                  <ProductThumb url={i.product.logoUrl} size={40} iconSize={18} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{i.product.name}</p>
+                    <p className="text-xs text-muted-foreground">{i.product.period}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-white tabular">{formatRp(i.product.price)}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
-        <div className="flex justify-between items-center pt-3" style={{ borderTop: '1px solid #2a3154' }}>
-          <span className="text-xs" style={{ color: '#8f9bbd' }}>Total</span>
-          <span className="font-display font-800 text-white">{formatRp(total)}</span>
+
+          {(profile?.contact_email || profile?.whatsapp) && (
+            <div className="alert alert-info">
+              <Icon name="mail" size={16} className="mt-0.5 flex-shrink-0" />
+              <p>
+                Data akun akan dikirim otomatis ke <span className="text-white font-medium">{profile?.contact_email || '-'}</span>
+                {profile?.whatsapp && <> &amp; WA <span className="text-white font-medium">{profile.whatsapp}</span></>}.
+                {' '}Bisa diubah di menu Pengaturan.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="card p-5 sm:p-6 lg:sticky lg:top-24 space-y-4">
+          <h2 className="section-title">Pembayaran</h2>
+          <dl className="space-y-3 text-sm">
+            <div className="flex justify-between"><dt className="text-muted-foreground">Subtotal ({cart.length} item)</dt><dd className="text-white tabular">{formatRp(total)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Saldo kamu</dt><dd className="text-white tabular">{formatRp(saldo)}</dd></div>
+          </dl>
+          <div className="divider" />
+          <div className="flex justify-between items-baseline">
+            <span className="text-sm text-muted-foreground">Total</span>
+            <span className="text-xl font-semibold text-white tabular">{formatRp(total)}</span>
+          </div>
+
+          {cukup ? (
+            <>
+              <div className="alert alert-success">
+                <Icon name="wallet" size={16} className="mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-white">Dibayar pakai Saldo</p>
+                  <p className="text-[13px] opacity-90">Saldo kamu {formatRp(saldo)} — cukup untuk pesanan ini</p>
+                </div>
+              </div>
+
+              {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{err}</span></div>}
+
+              <button onClick={buyWithSaldo} disabled={buying} className="btn btn-primary btn-lg btn-block">
+                {buying ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Memproses...</> : <>Beli Sekarang <Icon name="check" size={18} strokeWidth={2.25} /></>}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="alert alert-warning">
+                <Icon name="wallet" size={16} className="mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-white">Saldo Anda tidak cukup</p>
+                  <p className="text-[13px] opacity-90">Silakan top up terlebih dahulu. Saldo kamu {formatRp(saldo)}, dibutuhkan {formatRp(total)}.</p>
+                </div>
+              </div>
+
+              <button onClick={onGoTopUp} className="btn btn-primary btn-lg btn-block">
+                <Icon name="card" size={18} /> Top Up Saldo
+              </button>
+            </>
+          )}
         </div>
       </div>
-
-      {(profile?.contact_email || profile?.whatsapp) && (
-        <div className="rounded-2xl p-3.5 flex items-start gap-2.5" style={{ background: '#0f1220', border: '1px solid #2a3154' }}>
-          <span style={{ color: '#3d7ef5' }}><Icon name="check" size={15} strokeWidth={3} /></span>
-          <p className="text-[11px] leading-relaxed" style={{ color: '#8f9bbd' }}>
-            Data akun akan dikirim otomatis ke <span className="text-white font-display font-700">{profile?.contact_email || '-'}</span>
-            {profile?.whatsapp && <> &amp; WA <span className="text-white font-display font-700">{profile.whatsapp}</span></>}.
-            {' '}Bisa diubah di menu Pengaturan.
-          </p>
-        </div>
-      )}
-
-      {cukup ? (
-        <>
-          <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: '#0f3320', border: '1px solid #1d5a3a' }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: TONE.green }}><Icon name="wallet" size={18} /></div>
-            <div>
-              <p className="font-display font-700 text-white text-sm">Dibayar pakai Saldo</p>
-              <p className="text-[11px]" style={{ color: '#8f9bbd' }}>Saldo kamu {formatRp(saldo)} — cukup untuk pesanan ini</p>
-            </div>
-          </div>
-
-          {err && <p className="text-[11px] text-center" style={{ color: '#f87171' }}>{err}</p>}
-
-          <button onClick={buyWithSaldo} disabled={buying}
-            className="w-full text-white font-display font-800 text-sm tracking-widest uppercase py-4 rounded-2xl hover:brightness-110 transition disabled:opacity-60 flex items-center justify-center gap-2"
-            style={{ background: TONE.green }}>
-            {buying ? 'Memproses...' : <>Beli Sekarang <Icon name="check" size={18} strokeWidth={3} /></>}
-          </button>
-        </>
-      ) : (
-        <>
-          <div className="rounded-2xl p-4 flex items-start gap-3" style={{ background: '#3a1f12', border: '1px solid #6b3a1c' }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: TONE.gold }}><Icon name="wallet" size={18} /></div>
-            <div>
-              <p className="font-display font-700 text-white text-sm">Saldo Anda tidak cukup</p>
-              <p className="text-[11px]" style={{ color: '#c9a27a' }}>Silakan top up terlebih dahulu. Saldo kamu {formatRp(saldo)}, dibutuhkan {formatRp(total)}.</p>
-            </div>
-          </div>
-
-          <button onClick={onGoTopUp}
-            className="w-full text-white font-display font-800 text-sm tracking-widest uppercase py-4 rounded-2xl hover:brightness-110 transition flex items-center justify-center gap-2"
-            style={{ background: TONE.gold }}>
-            <Icon name="card" size={18} /> Top Up Saldo
-          </button>
-        </>
-      )}
     </div>
   )
 }
@@ -862,49 +914,67 @@ function ProfilePage({ user, isAdmin, profile, onSaved }: { user: SessionUser; i
   }
 
   const fakeUser: SessionUser = { ...user, user_metadata: { ...user.user_metadata, avatar_url: avatarUrl } }
-  const field = 'w-full text-white text-sm px-4 py-3 rounded-xl focus:outline-none transition-colors'
-  const fieldStyle = { background: '#0b0d18', border: '1px solid #2a3154' }
 
   return (
-    <div className="space-y-3.5">
-      <h1 className="font-display font-800 text-2xl text-white pt-1">Pengaturan</h1>
+    <div className="space-y-6 max-w-3xl">
+      <PageHeader title="Pengaturan" subtitle="Kelola profil dan data kontak untuk pembelian." />
 
-      {msg && <p className="text-xs rounded-xl p-3" style={{ background: '#0f3320', color: '#4ade80' }}>{msg}</p>}
-      {err && <p className="text-xs rounded-xl p-3" style={{ background: '#3b1219', color: '#fca5a5' }}>{err}</p>}
+      {msg && <div className="alert alert-success"><Icon name="circleCheck" size={16} className="mt-0.5" /><span>{msg}</span></div>}
+      {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{err}</span></div>}
 
-      <div className="rounded-2xl p-5 flex flex-col items-center gap-3" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <Avatar user={fakeUser} size={80} />
-        <label className="text-xs font-display font-700 cursor-pointer px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition hover:brightness-110" style={{ background: '#2657c9', color: '#fff' }}>
-          <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && pickAvatar(e.target.files[0])} />
-          <Icon name="image" size={14} /> {uploading ? 'Mengunggah...' : 'Ganti Foto Profil'}
-        </label>
-        {isAdmin && <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-1 rounded-full text-[10px] font-display font-700 text-white" style={{ background: '#2657c9' }}><Icon name="shield" size={12} /> Admin</span>}
-      </div>
-
-      <div className="rounded-2xl p-4 space-y-3.5" style={{ background: '#171d36', border: '1px solid #2a3154' }}>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-widest mb-1.5 block" style={{ color: '#8f9bbd' }}>Nama Lengkap</span>
-          <input className={field} style={fieldStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Nama kamu" />
-        </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-widest mb-1.5 block" style={{ color: '#8f9bbd' }}>Nomor WhatsApp</span>
-          <input className={field} style={fieldStyle} value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="mis. 6281234567890" inputMode="tel" />
-        </label>
-        <label className="block">
-          <span className="text-[10px] uppercase tracking-widest mb-1.5 block" style={{ color: '#8f9bbd' }}>Email untuk Isi Otomatis Pembelian</span>
-          <input className={field} style={fieldStyle} value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="email@contoh.com" type="email" />
-          <span className="text-[10px] mt-1.5 block leading-relaxed" style={{ color: '#8f9bbd' }}>Email & nomor WhatsApp ini otomatis dipakai untuk mengisi data pembelian saat checkout.</span>
-        </label>
-        <div className="flex justify-between items-center pt-1" style={{ borderTop: '1px solid #2a3154' }}>
-          <span className="text-xs pt-3" style={{ color: '#8f9bbd' }}>Login via Google · {user.email}</span>
+      {/* Profile section */}
+      <section className="card">
+        <div className="px-5 sm:px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h2 className="section-title">Profil</h2>
+          <p className="hint mt-1">Foto dan nama yang ditampilkan di akunmu.</p>
         </div>
-      </div>
+        <div className="px-5 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center gap-5">
+          <Avatar user={fakeUser} size={72} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[15px] font-semibold text-white truncate">{name || displayName(user)}</p>
+              {isAdmin && <span className="badge badge-primary"><Icon name="shield" size={12} /> Admin</span>}
+            </div>
+            <p className="text-[13px] text-muted-foreground truncate">{user.email}</p>
+            <p className="hint mt-1">JPG, PNG atau GIF. Maksimal {MAX_AVATAR_MB} MB.</p>
+          </div>
+          <label className={`btn btn-secondary cursor-pointer self-start sm:self-center ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && pickAvatar(e.target.files[0])} />
+            {uploading ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Icon name="upload" size={16} />}
+            {uploading ? 'Mengunggah...' : 'Ganti Foto Profil'}
+          </label>
+        </div>
+        <div className="px-5 sm:px-6 pb-6">
+          <label className="block max-w-md">
+            <span className="label">Nama lengkap</span>
+            <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nama kamu" />
+          </label>
+        </div>
+      </section>
 
-      <button onClick={save} disabled={saving}
-        className="w-full text-white font-display font-800 text-sm tracking-widest uppercase py-4 rounded-2xl hover:brightness-110 transition disabled:opacity-60 flex items-center justify-center gap-2"
-        style={{ background: '#3d7ef5' }}>
-        {saving ? 'Menyimpan...' : <><Icon name="check" size={18} strokeWidth={3} /> Simpan Pengaturan</>}
-      </button>
+      {/* Contact section */}
+      <section className="card">
+        <div className="px-5 sm:px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h2 className="section-title">Kontak pembelian</h2>
+          <p className="hint mt-1">Email &amp; nomor WhatsApp ini otomatis dipakai untuk mengisi data pembelian saat checkout.</p>
+        </div>
+        <div className="px-5 sm:px-6 py-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <label className="block">
+            <span className="label">Nomor WhatsApp</span>
+            <input className="input" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="mis. 6281234567890" inputMode="tel" />
+          </label>
+          <label className="block">
+            <span className="label">Email untuk isi otomatis pembelian</span>
+            <input className="input" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="email@contoh.com" type="email" />
+          </label>
+        </div>
+        <div className="px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)', borderRadius: '0 0 16px 16px' }}>
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5 min-w-0"><Icon name="lock" size={13} /> <span className="truncate">Login via Google · {user.email}</span></span>
+          <button onClick={save} disabled={saving} className="btn btn-primary w-full sm:w-auto">
+            {saving ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Menyimpan...</> : <><Icon name="check" size={16} strokeWidth={2.25} /> Simpan Pengaturan</>}
+          </button>
+        </div>
+      </section>
     </div>
   )
 }
@@ -915,13 +985,17 @@ function CartBar({ cart, onCheckout }: { cart: CartItem[]; onCheckout: () => voi
   if (cart.length === 0) return null
   const total = cart.reduce((s, i) => s + i.product.price, 0)
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-20 p-4" style={{ background: '#0b0d18', borderTop: '1px solid #2a3154', boxShadow: '0 -8px 24px #0b0d18' }}>
-      <button onClick={onCheckout}
-        className="w-full text-white font-display font-800 text-sm py-4 rounded-2xl flex items-center justify-between px-5 hover:brightness-110 transition"
-        style={{ background: '#3d7ef5' }}>
-        <span className="flex items-center gap-2"><Icon name="cart" size={18} /> {cart.length} item dipilih</span>
-        <span>Checkout · {formatRp(total)}</span>
-      </button>
+    <div className="fixed bottom-0 left-0 right-0 lg:left-64 z-20 px-4 pb-4 pt-3 sm:px-6 bg-gradient-to-t from-[#0b1220] via-[#0b1220]/95 to-transparent">
+      <div className="max-w-5xl mx-auto card flex items-center gap-3 p-2 pl-4 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]" style={{ borderColor: 'rgba(255,255,255,0.08)', animation: 'dialog-in 200ms' }}>
+        <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="cart" size={16} /></div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-white">{cart.length} item dipilih</p>
+          <p className="text-xs text-muted-foreground tabular">{formatRp(total)}</p>
+        </div>
+        <button onClick={onCheckout} className="btn btn-primary">
+          Checkout <span className="hidden sm:inline tabular">· {formatRp(total)}</span> <Icon name="chevronRight" size={16} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -1020,13 +1094,17 @@ export default function App() {
     setSession(null); setOrders([]); setSaldo(0); setCart([]); setProfile(null); setPageState('dashboard')
   }
 
-  if (booting) return <div className="min-h-screen flex items-center justify-center text-sm" style={{ background: '#0b0d18', color: '#8f9bbd' }}>Memuat...</div>
+  if (booting) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background text-sm text-muted-foreground">
+      <span className="w-5 h-5 rounded-full border-2 border-slate-700 border-t-[#4f7cff] animate-spin" />
+      Memuat...
+    </div>
+  )
   if (!session) return <LoginPage />
 
   return (
     <div
-      className="min-h-screen text-white"
-      style={{ background: '#0b0d18' }}
+      className="min-h-screen text-white bg-background"
       onClick={() => setDropdownOpen(false)}
     >
       <Header
@@ -1034,6 +1112,9 @@ export default function App() {
         onProfileClick={e => { e.stopPropagation(); setDropdownOpen(d => !d) }}
         showDropdown={dropdownOpen}
         onSettingsClick={() => navigate('profile')}
+        user={session.user}
+        profile={profile}
+        page={page}
         onProfileAction={a => {
           setDropdownOpen(false)
           if (a === 'My Profile' || a === 'Settings') navigate('profile')
@@ -1052,8 +1133,9 @@ export default function App() {
         onLogout={logout}
       />
 
-      <main className="max-w-lg mx-auto px-4 pb-32" style={{ paddingTop: '72px' }}>
-        {notice && <p className="text-xs rounded-xl p-3 mb-3" style={{ background: '#3b1219', color: '#fca5a5' }}>{notice}</p>}
+      <main className="lg:pl-64 pt-16">
+        <div key={page} className={`page-enter max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 ${cart.length > 0 && page !== 'checkout' ? 'pb-36' : 'pb-24'}`}>
+        {notice && <div className="alert alert-danger mb-6"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{notice}</span></div>}
         {page === 'dashboard' && <DashboardPage orders={orders} saldo={saldo} onNav={p => navigate(p)} onDetail={setDetailOrder} />}
         {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} />}
         {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} />}
@@ -1062,10 +1144,11 @@ export default function App() {
           onBoughtWithSaldo={handleCheckoutDone} onGoTopUp={() => navigate('saldo')} />}
         {page === 'profile'   && <ProfilePage user={session.user} isAdmin={isAdmin} profile={profile} onSaved={patch => setProfile(pr => ({ ...(pr ?? {}), ...patch }))} />}
         {page === 'admin' && isAdmin && <AdminPage onChanged={refreshCatalog} />}
+        </div>
       </main>
 
       {page !== 'checkout' && <CartBar cart={cart} onCheckout={() => navigate('checkout')} />}
-      <SupportButton />
+      <SupportButton raised={cart.length > 0 && page !== 'checkout'} />
       {detailOrder && <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />}
     </div>
   )

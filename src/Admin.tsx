@@ -1,22 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, uploadFile, type Row } from './lib/supabase'
-import { Icon, TONE, formatRp, ProductThumb, type IconName } from './ui'
+import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, type IconName } from './ui'
 
-const CARD = { background: '#171d36', border: '1px solid #2a3154' }
-const MUTED = { color: '#8f9bbd' }
-const FIELD = 'w-full text-white text-xs px-3 py-2.5 rounded-lg focus:outline-none'
-const FIELD_STYLE = { background: '#0b0d18', border: '1px solid #2a3154' }
+const MUTED = { color: '#94a3b8' }
+const FIELD = 'input input-sm'
+const FIELD_STYLE = {} as React.CSSProperties
 const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna']] as const
 const EMPTY = { name: '', category: '', tagline: '', price: '', original_price: '', period: '/bln', features: '', badge: '', popular: false, logo_url: '' }
 const MAX_LOGO_MB = 10
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="text-[10px] mb-1 block" style={MUTED}>{label}</span>{children}</label>
+  return <label className="block"><span className="text-[12px] font-medium text-slate-300 mb-1.5 block">{label}</span>{children}</label>
 }
 
-function Btn({ children, onClick, color = '#3d7ef5', disabled }: { children: React.ReactNode; onClick: () => void; color?: string; disabled?: boolean }) {
+type BtnVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'ghost'
+
+// `color` dipertahankan untuk kompatibilitas; dipetakan ke varian tombol netral.
+const COLOR_VARIANT: Record<string, BtnVariant> = {
+  '#3d7ef5': 'primary', '#2657c9': 'secondary', '#15803d': 'success', '#b91c1c': 'danger', '#b45309': 'warning', '#4b5378': 'ghost',
+}
+
+function Btn({ children, onClick, color = '#3d7ef5', variant, disabled }: { children: React.ReactNode; onClick: () => void; color?: string; variant?: BtnVariant; disabled?: boolean }) {
+  const v = variant ?? COLOR_VARIANT[color] ?? 'primary'
+  const cls = v === 'ghost' ? 'btn-secondary' : `btn-${v}`
   return (
-    <button onClick={onClick} disabled={disabled} className="px-3 py-2 rounded-lg text-[11px] font-display font-700 text-white flex items-center gap-1.5 hover:brightness-110 transition disabled:opacity-50" style={{ background: color }}>
+    <button onClick={onClick} disabled={disabled} className={`btn btn-sm ${cls}`}>
       {children}
     </button>
   )
@@ -24,13 +32,13 @@ function Btn({ children, onClick, color = '#3d7ef5', disabled }: { children: Rea
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-[#03040a]/90 p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl p-4 space-y-3 max-h-[85vh] overflow-y-auto" style={CARD} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <p className="font-display font-700 text-white text-sm">{title}</p>
-          <button onClick={onClose} style={MUTED} className="w-8 h-8 rounded-full flex items-center justify-center hover:text-white transition-colors" aria-label="Tutup"><Icon name="x" size={16} /></button>
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm" aria-label="Tutup"><Icon name="x" size={18} /></button>
         </div>
-        {children}
+        <div className="p-5 space-y-4">{children}</div>
       </div>
     </div>
   )
@@ -142,198 +150,263 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   }
 
   return (
-    <div className="space-y-3.5">
-      <h1 className="font-display font-800 text-2xl text-white flex items-center gap-2"><Icon name="shield" size={24} /> Dashboard Admin</h1>
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {TABS.map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} className="px-4 py-2 rounded-full text-xs font-display font-700 whitespace-nowrap transition"
-            style={{ background: tab === id ? '#3d7ef5' : '#171d36', color: tab === id ? '#fff' : '#8f9bbd', border: '1px solid #2a3154' }}>{label}</button>
-        ))}
+    <div className="space-y-6">
+      <PageHeader title="Dashboard Admin" subtitle="Kelola pesanan, produk, top up, dan pengguna."
+        leading={<div className="icon-tile hidden sm:inline-flex" style={{ width: 44, height: 44 }}><Icon name="shield" size={20} /></div>} />
+
+      <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
+        <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+          {TABS.map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} className={`chip ${tab === id ? 'chip-active' : ''}`}>{label}</button>
+          ))}
+        </div>
       </div>
-      {ok && <p className="text-xs rounded-xl p-3" style={{ background: '#0f3320', color: '#4ade80' }}>{ok}</p>}
-      {err && <p className="text-xs rounded-xl p-3" style={{ background: '#3b1219', color: '#fca5a5' }}>{err}</p>}
+      {ok && <div className="alert alert-success"><Icon name="circleCheck" size={16} className="mt-0.5" /><span>{ok}</span></div>}
+      {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{err}</span></div>}
 
       {tab === 'ringkasan' && (
-        <div className="grid grid-cols-2 gap-3">
-          {([['users', 'Pengguna', d.users.length, TONE.blue], ['clipboard', 'Pesanan', d.orders.length, TONE.purple], ['refresh', 'Menunggu', pending, TONE.gold], ['wallet', 'Pendapatan', formatRp(revenue), TONE.green]] as [IconName, string, string | number, string][]).map(([ic, label, val, bg]) => (
-            <div key={label} className="rounded-2xl p-4 flex flex-col gap-2" style={CARD}>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ background: bg }}><Icon name={ic} size={20} /></div>
-              <p className="font-display font-800 text-white text-lg leading-tight">{val}</p>
-              <p className="text-[11px]" style={MUTED}>{label}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          {([['users', 'Pengguna', d.users.length], ['clipboard', 'Pesanan', d.orders.length], ['clock', 'Menunggu', pending], ['wallet', 'Pendapatan', formatRp(revenue)]] as [IconName, string, string | number][]).map(([ic, label, val]) => (
+            <div key={label} className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
+              <div className="icon-tile"><Icon name={ic} size={18} /></div>
+              <div className="min-w-0">
+                <p className="text-[13px] text-muted-foreground">{label}</p>
+                <p className="text-xl font-semibold text-white tracking-tight tabular truncate mt-0.5">{val}</p>
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {tab === 'pesanan' && (
-        <div className="space-y-3">
-          <div className="rounded-2xl p-3.5 space-y-2" style={CARD}>
+        <div className="space-y-4">
+          <div className="card p-4 sm:p-5 space-y-2">
             <Field label="Cari ID pesanan (mis. ORD-12 atau 12), nama produk, atau email pembeli">
               <div className="relative">
-                <input className={FIELD} style={{ ...FIELD_STYLE, paddingRight: '2.2rem' }} placeholder="mis. ORD-12" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2" style={MUTED}><Icon name="tag" size={14} /></span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={MUTED}><Icon name="search" size={16} /></span>
+                <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. ORD-12" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
               </div>
             </Field>
-            {oq && <p className="text-[11px]" style={MUTED}>{filteredOrders.length > 0 ? `Ditemukan ${filteredOrders.length} pesanan cocok.` : 'Tidak ada pesanan yang cocok.'}</p>}
+            {oq && <p className="hint">{filteredOrders.length > 0 ? `Ditemukan ${filteredOrders.length} pesanan cocok.` : 'Tidak ada pesanan yang cocok.'}</p>}
           </div>
           {filteredOrders.length === 0 ? (
-            <p className="text-xs text-center py-8" style={MUTED}>{oq ? 'Tidak ada pesanan yang cocok dengan pencarian.' : 'Belum ada pesanan.'}</p>
-          ) : filteredOrders.map(o => (
-            <div key={o.id} className="rounded-2xl p-3.5 space-y-2.5" style={CARD}>
-              <div className="flex justify-between gap-2">
-                <div className="min-w-0 flex items-center gap-2">
-                  <ProductThumb url={o.logo_url} size={34} />
-                  <div className="min-w-0">
-                    <p className="font-display font-700 text-white text-sm truncate">{o.product_name}</p>
-                    <p className="text-[10px] truncate" style={MUTED}>{who(o.user_id)}</p>
+            <div className="card"><EmptyState icon="clipboard" title={oq ? 'Tidak ada pesanan yang cocok dengan pencarian.' : 'Belum ada pesanan.'} /></div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
+              {filteredOrders.map(o => (
+                <div key={o.id} className="card p-4 sm:p-5 space-y-4">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <ProductThumb url={o.logo_url} size={40} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{o.product_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{who(o.user_id)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-semibold text-white tabular whitespace-nowrap">{formatRp(o.price)}</p>
+                      <div className="mt-1"><StatusBadge status={o.status} /></div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5">
+                    <span className="text-[13px] font-medium text-white flex-1 truncate font-mono">ORD-{o.id}</span>
+                    <button onClick={() => copyOrderId(o.id)} className="btn btn-ghost btn-sm" aria-label="Salin ID pesanan">
+                      <Icon name="copy" size={14} /> Salin ID
+                    </button>
+                  </div>
+                  {(o.buyer_whatsapp || o.buyer_contact_email) && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Icon name="mail" size={13} /> Kontak: {o.buyer_contact_email ?? '-'}{o.buyer_whatsapp ? ` · WA ${o.buyer_whatsapp}` : ''}</p>
+                  )}
+                  <Field label="Status">
+                    <select value={o.status} onChange={e => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: { status: e.target.value } }))} className={FIELD} style={FIELD_STYLE}>
+                      <option value="pending">Menunggu konfirmasi</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option>
+                    </select>
+                  </Field>
+                  <Field label="Data akun / info penting (dikirim ke user)">
+                    <textarea className="input" rows={2} placeholder="mis. IP: 1.2.3.4, user: root, pass: ****"
+                      value={orderNotes[o.id] ?? o.account_data ?? ''} onChange={e => setOrderNotes(prev => ({ ...prev, [o.id]: e.target.value }))} />
+                  </Field>
+                  <div className="flex justify-end">
+                    <Btn onClick={() => saveAccountData(o)} variant="primary"><Icon name="check" size={14} /> Simpan Data Akun</Btn>
                   </div>
                 </div>
-                <p className="font-display font-800 text-white text-sm whitespace-nowrap">{formatRp(o.price)}</p>
-              </div>
-              <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={FIELD_STYLE}>
-                <span className="text-[11px] font-display font-700 text-white flex-1 truncate">ORD-{o.id}</span>
-                <button onClick={() => copyOrderId(o.id)} className="text-[10px] font-display font-700 px-2 py-1 rounded-md flex items-center gap-1 hover:brightness-110 transition" style={{ background: '#2a3154', color: '#8f9bbd' }} aria-label="Salin ID pesanan">
-                  <Icon name="clipboard" size={12} /> Salin ID
-                </button>
-              </div>
-              {(o.buyer_whatsapp || o.buyer_contact_email) && (
-                <p className="text-[10px]" style={MUTED}>Kontak: {o.buyer_contact_email ?? '-'}{o.buyer_whatsapp ? ` · WA ${o.buyer_whatsapp}` : ''}</p>
-              )}
-              <select value={o.status} onChange={e => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: { status: e.target.value } }))} className={FIELD} style={FIELD_STYLE}>
-                <option value="pending">Menunggu konfirmasi</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option>
-              </select>
-              <Field label="Data akun / info penting (dikirim ke user)">
-                <textarea className={FIELD} style={FIELD_STYLE} rows={2} placeholder="mis. IP: 1.2.3.4, user: root, pass: ****"
-                  value={orderNotes[o.id] ?? o.account_data ?? ''} onChange={e => setOrderNotes(prev => ({ ...prev, [o.id]: e.target.value }))} />
-              </Field>
-              <Btn onClick={() => saveAccountData(o)} color="#2657c9"><Icon name="check" size={13} /> Simpan Data Akun</Btn>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 
       {tab === 'produk' && (
-        <>
-          <div className="rounded-2xl p-3.5 space-y-2.5" style={CARD}>
-            <p className="font-display font-700 text-white text-sm flex items-center gap-1.5"><Icon name="tag" size={14} /> Kelola Kategori</p>
-            <div className="flex gap-2">
-              <input className={FIELD} style={FIELD_STYLE} placeholder="Nama kategori baru" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
-              <Btn onClick={addCategory} color="#15803d"><Icon name="plus" size={13} /></Btn>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4 items-start">
+            <div className="card p-4 sm:p-5 space-y-4">
+              <div>
+                <p className="section-title flex items-center gap-2"><Icon name="tag" size={16} className="text-muted-foreground" /> Kelola Kategori</p>
+                <p className="hint mt-1">Kategori tampil sebagai filter di halaman Produk.</p>
+              </div>
+              <div className="flex gap-2">
+                <input className={FIELD} style={FIELD_STYLE} placeholder="Nama kategori baru" value={newCategory} onChange={e => setNewCategory(e.target.value)} />
+                <Btn onClick={addCategory} variant="secondary"><Icon name="plus" size={14} /> Tambah</Btn>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {d.categories.length === 0 && <p className="hint">Belum ada kategori. Tambahkan kategori dulu sebelum membuat produk.</p>}
+                {d.categories.map(c => (
+                  <span key={c.id} className="badge badge-neutral pr-1" style={{ height: 28 }}>
+                    {c.name}
+                    <button onClick={() => removeCategory(c)} className="w-5 h-5 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors duration-200" aria-label={`Hapus ${c.name}`}><Icon name="x" size={12} /></button>
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {d.categories.length === 0 && <p className="text-[10px]" style={MUTED}>Belum ada kategori. Tambahkan kategori dulu sebelum membuat produk.</p>}
-              {d.categories.map(c => (
-                <span key={c.id} className="text-[10px] font-display font-700 pl-2.5 pr-1.5 py-1 rounded-full flex items-center gap-1" style={{ background: '#0b0d18', border: '1px solid #2a3154', color: '#8f9bbd' }}>
-                  {c.name}
-                  <button onClick={() => removeCategory(c)} className="w-4 h-4 rounded-full flex items-center justify-center hover:text-white" aria-label={`Hapus ${c.name}`}><Icon name="x" size={10} /></button>
-                </span>
-              ))}
+
+            <div className="card p-4 sm:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="section-title">{editId ? 'Edit Produk' : 'Tambah Produk'}</p>
+                {editId && <span className="badge badge-primary">Mode edit</span>}
+              </div>
+              <Field label="Nama produk"><input className={FIELD} style={FIELD_STYLE} placeholder="mis. VPS Starter" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Kategori">
+                  <select className={FIELD} style={FIELD_STYLE} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} disabled={categoryNames.length === 0}>
+                    {categoryNames.length === 0 ? <option value="">Tambahkan kategori dulu</option> : categoryNames.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </Field>
+                <Field label="Periode"><input className={FIELD} style={FIELD_STYLE} placeholder="/bln" value={form.period} onChange={e => setForm({ ...form, period: e.target.value })} /></Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Harga (Rp)"><input className={FIELD} style={FIELD_STYLE} placeholder="35000" inputMode="numeric" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></Field>
+                <Field label="Harga coret (opsional)"><input className={FIELD} style={FIELD_STYLE} placeholder="50000" inputMode="numeric" value={form.original_price} onChange={e => setForm({ ...form, original_price: e.target.value })} /></Field>
+              </div>
+              <Field label="Deskripsi singkat"><input className={FIELD} style={FIELD_STYLE} value={form.tagline} onChange={e => setForm({ ...form, tagline: e.target.value })} /></Field>
+              <Field label="Fitur (pisahkan dengan koma)"><input className={FIELD} style={FIELD_STYLE} placeholder="1 vCPU, 1 GB RAM, 20 GB SSD" value={form.features} onChange={e => setForm({ ...form, features: e.target.value })} /></Field>
+              <Field label={`Foto / logo produk (maks ${MAX_LOGO_MB} MB — dipakai sebagai thumbnail produk)`}>
+                <div className="flex items-center gap-3">
+                  <ProductThumb url={form.logo_url} size={40} />
+                  <label className="flex-1 min-w-0">
+                    <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
+                    <span className="input input-sm cursor-pointer flex items-center gap-2 text-slate-300"><Icon name="upload" size={14} /> <span className="truncate">{logoUploading ? 'Mengunggah...' : (form.logo_url ? 'Ganti foto' : 'Pilih foto produk')}</span></span>
+                  </label>
+                  {form.logo_url && <Btn onClick={() => setForm(f => ({ ...f, logo_url: '' }))} variant="ghost"><Icon name="x" size={14} /></Btn>}
+                </div>
+              </Field>
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <Field label="Label (opsional)"><input className={FIELD} style={FIELD_STYLE} placeholder="Promo / Terlaris" value={form.badge} onChange={e => setForm({ ...form, badge: e.target.value })} /></Field>
+                <label className="flex items-center gap-2.5 text-[13px] text-slate-200 h-9 cursor-pointer select-none">
+                  <input type="checkbox" className="w-4 h-4 rounded accent-[#4f7cff]" checked={form.popular} onChange={e => setForm({ ...form, popular: e.target.checked })} /> Tandai populer
+                </label>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                {editId && <Btn onClick={() => { setForm(f => ({ ...EMPTY, category: f.category })); setEditId(null) }} variant="ghost">Batal</Btn>}
+                <Btn onClick={saveProduct} variant="primary"><Icon name={editId ? 'check' : 'plus'} size={14} strokeWidth={2.25} /> {editId ? 'Simpan Perubahan' : 'Tambah Produk'}</Btn>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-2xl p-3.5 space-y-2.5" style={CARD}>
-            <p className="font-display font-700 text-white text-sm">{editId ? 'Edit Produk' : 'Tambah Produk'}</p>
-            <Field label="Nama produk"><input className={FIELD} style={FIELD_STYLE} placeholder="mis. VPS Starter" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Kategori">
-                <select className={FIELD} style={FIELD_STYLE} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} disabled={categoryNames.length === 0}>
-                  {categoryNames.length === 0 ? <option value="">Tambahkan kategori dulu</option> : categoryNames.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </Field>
-              <Field label="Periode"><input className={FIELD} style={FIELD_STYLE} placeholder="/bln" value={form.period} onChange={e => setForm({ ...form, period: e.target.value })} /></Field>
+          <div className="card overflow-hidden">
+            <div className="px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <p className="section-title">Daftar produk</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{d.products.length} produk</p>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Harga (Rp)"><input className={FIELD} style={FIELD_STYLE} placeholder="35000" inputMode="numeric" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} /></Field>
-              <Field label="Harga coret (opsional)"><input className={FIELD} style={FIELD_STYLE} placeholder="50000" inputMode="numeric" value={form.original_price} onChange={e => setForm({ ...form, original_price: e.target.value })} /></Field>
-            </div>
-            <Field label="Deskripsi singkat"><input className={FIELD} style={FIELD_STYLE} value={form.tagline} onChange={e => setForm({ ...form, tagline: e.target.value })} /></Field>
-            <Field label="Fitur (pisahkan dengan koma)"><input className={FIELD} style={FIELD_STYLE} placeholder="1 vCPU, 1 GB RAM, 20 GB SSD" value={form.features} onChange={e => setForm({ ...form, features: e.target.value })} /></Field>
-            <Field label={`Foto / logo produk (maks ${MAX_LOGO_MB} MB — dipakai sebagai thumbnail produk)`}>
-              <div className="flex items-end gap-2">
-                <ProductThumb url={form.logo_url} size={40} />
-                <label className="flex-1">
-                  <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleLogoUpload(e.target.files[0])} />
-                  <span className={FIELD + ' cursor-pointer flex items-center gap-1.5'} style={FIELD_STYLE}><Icon name="upload" size={13} /> {logoUploading ? 'Mengunggah...' : (form.logo_url ? 'Ganti foto' : 'Pilih foto produk')}</span>
-                </label>
-                {form.logo_url && <Btn onClick={() => setForm(f => ({ ...f, logo_url: '' }))} color="#4b5378"><Icon name="x" size={13} /></Btn>}
-              </div>
-            </Field>
-            <div className="grid grid-cols-2 gap-2 items-end">
-              <Field label="Label (opsional)"><input className={FIELD} style={FIELD_STYLE} placeholder="Promo / Terlaris" value={form.badge} onChange={e => setForm({ ...form, badge: e.target.value })} /></Field>
-              <label className="flex items-center gap-2 text-xs text-white pb-2.5"><input type="checkbox" checked={form.popular} onChange={e => setForm({ ...form, popular: e.target.checked })} /> Tandai populer</label>
-            </div>
-            <div className="flex gap-2">
-              <Btn onClick={saveProduct}><Icon name={editId ? 'check' : 'plus'} size={14} strokeWidth={2.5} /> {editId ? 'Simpan Perubahan' : 'Tambah Produk'}</Btn>
-              {editId && <Btn onClick={() => { setForm(f => ({ ...EMPTY, category: f.category })); setEditId(null) }} color="#4b5378">Batal</Btn>}
+            {d.products.length === 0 && <EmptyState icon="package" title="Belum ada produk." description="Tambahkan produk pertama lewat form di atas." />}
+            <div className="divide-y divide-white/[0.06]">
+              {d.products.map(p => (
+                <div key={p.id} className="px-4 sm:px-5 py-3.5 flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                  <ProductThumb url={p.logo_url} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground tabular">{p.category} · {formatRp(p.price)}{p.period}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <button onClick={() => run(() => api(`products?id=eq.${p.id}`, { method: 'PATCH', body: { active: !p.active } }))}
+                      className={`badge badge-dot cursor-pointer transition-opacity duration-200 hover:opacity-80 ${p.active ? 'badge-success' : 'badge-neutral'}`} style={{ height: 32, padding: '0 12px' }}>
+                      {p.active ? 'Aktif' : 'Nonaktif'}
+                    </button>
+                    <Btn onClick={() => startEdit(p)} variant="secondary"><Icon name="edit" size={14} /></Btn>
+                    <Btn onClick={() => confirm(`Hapus ${p.name}?`) && run(() => api(`products?id=eq.${p.id}`, { method: 'DELETE' }))} variant="danger"><Icon name="trash" size={14} /></Btn>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          {d.products.length === 0 && <p className="text-xs text-center py-4" style={MUTED}>Belum ada produk. Tambahkan produk pertama lewat form di atas.</p>}
-          {d.products.map(p => (
-            <div key={p.id} className="rounded-2xl p-3 flex items-center gap-3" style={CARD}>
-              <ProductThumb url={p.logo_url} size={40} />
-              <div className="min-w-0 flex-1"><p className="font-display font-700 text-white text-sm truncate">{p.name}</p><p className="text-[10px]" style={MUTED}>{p.category} · {formatRp(p.price)}{p.period}</p></div>
-              <Btn onClick={() => startEdit(p)} color="#2657c9"><Icon name="edit" size={14} /></Btn>
-              <Btn onClick={() => run(() => api(`products?id=eq.${p.id}`, { method: 'PATCH', body: { active: !p.active } }))} color={p.active ? '#15803d' : '#4b5378'}>{p.active ? 'Aktif' : 'Nonaktif'}</Btn>
-              <Btn onClick={() => confirm(`Hapus ${p.name}?`) && run(() => api(`products?id=eq.${p.id}`, { method: 'DELETE' }))} color="#b91c1c"><Icon name="trash" size={14} /></Btn>
-            </div>
-          ))}
-        </>
+        </div>
       )}
 
       {tab === 'pengguna' && (() => {
         const q = emailSearch.trim().toLowerCase()
         const filtered = q ? d.users.filter(u => (u.email ?? '').toLowerCase().includes(q)) : d.users
         return (
-          <div className="space-y-3.5">
-            <div className="rounded-2xl p-3.5 space-y-2.5" style={CARD}>
+          <div className="space-y-4">
+            <div className="card p-4 sm:p-5 space-y-2">
               <Field label="Cek email pengguna">
-                <input className={FIELD} style={FIELD_STYLE} placeholder="mis. nama@gmail.com" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={MUTED}><Icon name="search" size={16} /></span>
+                  <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. nama@gmail.com" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
+                </div>
               </Field>
-              {q && <p className="text-[11px]" style={MUTED}>{filtered.length > 0 ? `Ditemukan ${filtered.length} email cocok.` : 'Email tidak terdaftar.'}</p>}
+              {q && <p className="hint">{filtered.length > 0 ? `Ditemukan ${filtered.length} email cocok.` : 'Email tidak terdaftar.'}</p>}
             </div>
-            {filtered.length === 0 ? (
-              <p className="text-xs text-center py-8" style={MUTED}>{q ? `Tidak ada pengguna dengan email mengandung "${emailSearch}"` : 'Belum ada pengguna.'}</p>
-            ) : filtered.map(u => (
-              <div key={u.id} className="rounded-2xl p-3 flex items-center gap-3" style={CARD}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: TONE.blue }}><Icon name="mail" size={16} /></div>
-                <div className="min-w-0 flex-1"><p className="font-display font-700 text-white text-xs truncate">{u.email ?? '(tanpa email)'}</p></div>
-                <Btn onClick={() => setDetailUser(u)} color="#2657c9"><Icon name="eye" size={13} /> Detail</Btn>
-              </div>
-            ))}
+            <div className="card overflow-hidden">
+              {filtered.length === 0 ? (
+                <EmptyState icon="users" title={q ? `Tidak ada pengguna dengan email mengandung "${emailSearch}"` : 'Belum ada pengguna.'} />
+              ) : (
+                <div className="divide-y divide-white/[0.06]">
+                  {filtered.map(u => (
+                    <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 transition-colors duration-200 hover:bg-white/[0.02]">
+                      <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="mail" size={16} /></div>
+                      <div className="min-w-0 flex-1"><p className="text-sm font-medium text-white truncate">{u.email ?? '(tanpa email)'}</p></div>
+                      <Btn onClick={() => setDetailUser(u)} variant="secondary"><Icon name="eye" size={14} /> Detail</Btn>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )
       })()}
 
-      {tab === 'topup' && (d.topups.length === 0 ? <p className="text-xs text-center py-8" style={MUTED}>Belum ada permintaan top up.</p> : d.topups.map(t => (
-        <div key={t.id} className="rounded-2xl p-3.5 flex items-center gap-3" style={CARD}>
-          <div className="min-w-0 flex-1"><p className="font-display font-800 text-white text-sm">{formatRp(t.amount)}</p><p className="text-[10px] truncate" style={MUTED}>{who(t.user_id)} · {t.status}</p></div>
-          {t.status === 'pending' && <>
-            <Btn onClick={() => run(() => api('rpc/approve_topup', { method: 'POST', body: { tid: t.id } }))} color="#15803d"><Icon name="check" size={14} strokeWidth={3} /> Setujui</Btn>
-            <Btn onClick={() => run(() => api(`topups?id=eq.${t.id}`, { method: 'PATCH', body: { status: 'rejected' } }))} color="#b91c1c"><Icon name="x" size={14} /></Btn>
-          </>}
+      {tab === 'topup' && (
+        <div className="card overflow-hidden">
+          {d.topups.length === 0 ? <EmptyState icon="wallet" title="Belum ada permintaan top up." /> : (
+            <div className="divide-y divide-white/[0.06]">
+              {d.topups.map(t => (
+                <div key={t.id} className="px-4 sm:px-5 py-3.5 flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                  <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="wallet" size={16} /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-white tabular">{formatRp(t.amount)}</p>
+                    <p className="text-xs text-muted-foreground truncate">{who(t.user_id)}</p>
+                  </div>
+                  <StatusBadge status={t.status} />
+                  {t.status === 'pending' && <div className="flex gap-1.5 ml-auto">
+                    <Btn onClick={() => run(() => api('rpc/approve_topup', { method: 'POST', body: { tid: t.id } }))} variant="success"><Icon name="check" size={14} strokeWidth={2.5} /> Setujui</Btn>
+                    <Btn onClick={() => run(() => api(`topups?id=eq.${t.id}`, { method: 'PATCH', body: { status: 'rejected' } }))} variant="danger"><Icon name="x" size={14} /></Btn>
+                  </div>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )))}
+      )}
 
       {detailUser && (
         <Modal title="Detail Pengguna" onClose={() => { setDetailUser(null); setSaldoAmount('') }}>
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: TONE.blue }}><Icon name="mail" size={20} /></div>
+            <div className="icon-tile" style={{ width: 44, height: 44 }}><Icon name="mail" size={18} /></div>
             <div className="min-w-0">
-              <p className="font-display font-700 text-white text-sm truncate">{detailUser.email ?? '(tanpa email)'}</p>
-              <p className="text-[10px]" style={MUTED}>{detailUser.full_name ?? 'Tanpa nama'}</p>
+              <p className="text-sm font-semibold text-white truncate">{detailUser.email ?? '(tanpa email)'}</p>
+              <p className="text-xs text-muted-foreground">{detailUser.full_name ?? 'Tanpa nama'}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl p-2.5" style={FIELD_STYLE}><p className="text-[9px] uppercase tracking-widest" style={MUTED}>Bergabung</p><p className="text-xs text-white font-display font-700">{new Date(detailUser.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
-            <div className="rounded-xl p-2.5" style={FIELD_STYLE}><p className="text-[9px] uppercase tracking-widest" style={MUTED}>Saldo sekarang</p><p className="text-xs text-white font-display font-700">{formatRp(detailUser.saldo ?? 0)}</p></div>
-            <div className="rounded-xl p-2.5 col-span-2" style={FIELD_STYLE}><p className="text-[9px] uppercase tracking-widest" style={MUTED}>Nomor HP / WhatsApp</p><p className="text-xs text-white font-display font-700">{detailUser.whatsapp || '-'}</p></div>
+            <div className="card-inset p-3"><p className="text-[11px] text-muted-foreground">Bergabung</p><p className="text-[13px] text-white font-medium mt-0.5">{new Date(detailUser.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
+            <div className="card-inset p-3"><p className="text-[11px] text-muted-foreground">Saldo sekarang</p><p className="text-[13px] text-white font-medium tabular mt-0.5">{formatRp(detailUser.saldo ?? 0)}</p></div>
+            <div className="card-inset p-3 col-span-2"><p className="text-[11px] text-muted-foreground">Nomor HP / WhatsApp</p><p className="text-[13px] text-white font-medium mt-0.5">{detailUser.whatsapp || '-'}</p></div>
           </div>
           <Field label="Nominal (Rp)">
-            <input className={FIELD} style={FIELD_STYLE} inputMode="numeric" placeholder="mis. 50000" value={saldoAmount} onChange={e => setSaldoAmount(e.target.value)} />
+            <input className="input" inputMode="numeric" placeholder="mis. 50000" value={saldoAmount} onChange={e => setSaldoAmount(e.target.value)} />
           </Field>
-          <div className="flex gap-2">
-            <Btn onClick={() => adjustSaldo(Number(saldoAmount.replace(/\D/g, '')))} color="#15803d" disabled={!saldoAmount}><Icon name="plus" size={13} /> Tambah Saldo</Btn>
-            <Btn onClick={() => adjustSaldo(-Number(saldoAmount.replace(/\D/g, '')))} color="#b45309" disabled={!saldoAmount}><Icon name="wallet" size={13} /> Refund / Kembalikan</Btn>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => adjustSaldo(Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-primary"><Icon name="plus" size={15} /> Tambah Saldo</button>
+            <button onClick={() => adjustSaldo(-Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-secondary"><Icon name="wallet" size={15} /> Refund / Kembalikan</button>
           </div>
         </Modal>
       )}
