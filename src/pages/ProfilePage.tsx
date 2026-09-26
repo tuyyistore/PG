@@ -91,8 +91,7 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
             <input className="input" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="email@contoh.com" type="email" />
           </label>
         </div>
-        <div className="px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)', borderRadius: '0 0 16px 16px' }}>
-          <span className="text-xs text-muted-foreground flex items-center gap-1.5 min-w-0"><Icon name="lock" size={13} /> <span className="truncate">Login via Google · {user.email}</span></span>
+        <div className="px-5 sm:px-6 py-4 flex sm:justify-end" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)', borderRadius: '0 0 16px 16px' }}>
           <button onClick={save} disabled={saving} className="btn btn-primary w-full sm:w-auto">
             {saving ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Menyimpan...</> : <><Icon name="check" size={16} strokeWidth={2.25} /> Simpan Pengaturan</>}
           </button>
