@@ -168,3 +168,17 @@ export async function api<T = Row[]>(path: string, opt: { method?: string; body?
   const txt = await r.text()
   return (txt ? JSON.parse(txt) : null) as T
 }
+
+/** Panggil endpoint serverless kita sendiri (folder /api), otomatis membawa Bearer token sesi. */
+export async function apiFn<T = any>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {
+  if (current && current.expires_at - 60 < now()) await refresh(current)
+  const r = await fetch(`/api/${path}`, {
+    method: opt.method ?? 'GET',
+    headers: { 'Content-Type': 'application/json', ...(current ? { Authorization: `Bearer ${current.access_token}` } : {}) },
+    body: opt.body === undefined ? undefined : JSON.stringify(opt.body),
+  })
+  const txt = await r.text()
+  const data = txt ? JSON.parse(txt) : null
+  if (!r.ok) throw new Error(data?.error ?? r.statusText)
+  return data as T
+}
