@@ -9,9 +9,17 @@ export function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => voi
 
   return (
     <div
-      className="card card-interactive overflow-hidden"
-      style={p.popular ? { borderColor: 'rgba(79,124,255,0.35)' } : undefined}
+      className="card card-interactive overflow-hidden relative"
+      style={p.popular ? { borderColor: 'rgba(79,124,255,0.35)', backgroundImage: 'linear-gradient(180deg, rgba(79,124,255,0.06) 0%, rgba(79,124,255,0) 60%)' } : undefined}
     >
+      {p.popular && (
+        <div
+          className="absolute top-2.5 -right-7 w-28 rotate-45 text-center text-[10px] font-semibold tracking-wide text-white py-0.5 pointer-events-none select-none"
+          style={{ background: 'linear-gradient(135deg, #4d8dff 0%, #2657c9 100%)', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}
+        >
+          TERLARIS
+        </div>
+      )}
       <button type="button" className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left" onClick={() => setExpanded(e => !e)} aria-expanded={expanded}>
         <ProductThumb url={p.logoUrl} size={48} iconSize={20} />
         <div className="flex-1 min-w-0">
@@ -28,32 +36,34 @@ export function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => voi
         <Icon name="chevronDown" size={16} className={`text-muted-foreground transition-transform duration-200 hidden sm:block ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
-      {expanded && (
-        <div className="px-4 sm:px-5 pb-5 pt-4 page-enter" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          {p.features.length > 0 && (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 mb-4">
-              {p.features.map(f => (
-                <li key={f} className="flex items-center gap-2 text-[13px] text-slate-300">
-                  <Icon name="check" size={14} strokeWidth={2.25} className="text-[#8fb0ff]" />{f}
-                </li>
-              ))}
-            </ul>
-          )}
-          {p.originalPrice && (
-            <p className="text-xs text-muted-foreground mb-2">
-              Harga normal <span className="line-through tabular">{formatRp(p.originalPrice)}{p.period}</span>
-            </p>
-          )}
-          <button
-            onClick={onAdd}
-            disabled={inCart}
-            className={`btn btn-block ${inCart ? '' : 'btn-primary'}`}
-            style={inCart ? { background: 'rgba(34,197,94,0.1)', color: '#4ade80', borderColor: 'rgba(34,197,94,0.2)', opacity: 1, cursor: 'default' } : undefined}
-          >
-            {inCart ? <><Icon name="check" size={16} strokeWidth={2.25} /> Ditambahkan</> : <><Icon name="cart" size={16} /> Tambah ke Keranjang</>}
-          </button>
+      <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden">
+          <div className="px-4 sm:px-5 pb-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {p.features.length > 0 && (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 mb-4">
+                {p.features.map(f => (
+                  <li key={f} className="flex items-center gap-2 text-[13px] text-slate-300">
+                    <Icon name="check" size={14} strokeWidth={2.25} className="text-[#8fb0ff]" />{f}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {p.originalPrice && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Harga normal <span className="line-through tabular">{formatRp(p.originalPrice)}{p.period}</span>
+              </p>
+            )}
+            <button
+              onClick={onAdd}
+              disabled={inCart}
+              className={`btn btn-block ${inCart ? '' : 'btn-primary'}`}
+              style={inCart ? { background: 'rgba(34,197,94,0.1)', color: '#4ade80', borderColor: 'rgba(34,197,94,0.2)', opacity: 1, cursor: 'default' } : undefined}
+            >
+              {inCart ? <><Icon name="check" size={16} strokeWidth={2.25} /> Ditambahkan</> : <><Icon name="cart" size={16} /> Tambah ke Keranjang</>}
+            </button>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -67,6 +77,7 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
   const tabs = ['Semua', ...categories]
   const filtered = tab === 'Semua' ? products : products.filter(p => p.category === tab)
   const cartIds = new Set(cart.map(i => i.product.id))
+  const countFor = (t: string) => t === 'Semua' ? products.length : products.filter(p => p.category === t).length
 
   // Geser kiri/kanan di area produk untuk pindah kategori, tanpa perlu menekan tab-nya.
   const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -91,7 +102,9 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
       <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
         <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
           {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`chip ${tab === t ? 'chip-active' : ''}`}>{t}</button>
+            <button key={t} onClick={() => setTab(t)} className={`chip ${tab === t ? 'chip-active' : ''}`}>
+              {t} <span className="opacity-60">({countFor(t)})</span>
+            </button>
           ))}
         </div>
       </div>

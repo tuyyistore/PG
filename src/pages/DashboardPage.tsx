@@ -1,16 +1,17 @@
-import { Icon, formatRp, PageHeader, EmptyState, SkeletonRows } from '../ui'
+import { useState } from 'react'
+import { Icon, formatRp, PageHeader, EmptyState, SkeletonRows, PullToRefresh } from '../ui'
 import { type Order } from '../types'
 import { StatCard, OrderRow } from '../components/Orders'
 import { SpendingChart } from '../components/SpendingChart'
 
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 
-export function DashboardPage({ orders, saldo, onNav, onDetail, loading }: { orders: Order[]; saldo: number; onNav: (p: string) => void; onDetail: (o: Order) => void; loading?: boolean }) {
+export function DashboardPage({ orders, saldo, onNav, onDetail, loading, onRefresh }: { orders: Order[]; saldo: number; onNav: (p: string) => void; onDetail: (o: Order) => void; loading?: boolean; onRefresh?: () => Promise<void> | void }) {
   const dibeli = orders.filter(o => o.status === 'aktif').length
   const pendingOrders = orders.filter(o => o.status === 'pending').length
   const dibatalkan = orders.filter(o => o.status === 'nonaktif').length
-
-  return (
+  const [saldoHidden, setSaldoHidden] = useState(false)
+  const body = (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
@@ -29,7 +30,17 @@ export function DashboardPage({ orders, saldo, onNav, onDetail, loading }: { ord
           <div className="icon-tile" style={{ width: 48, height: 48, borderRadius: 14 }}><Icon name="wallet" size={20} /></div>
           <div className="min-w-0">
             <p className="text-[13px] text-muted-foreground">Saldo tersedia</p>
-            {loading ? <div className="skeleton h-9 w-48 rounded-lg mt-1" /> : <p className="text-[28px] sm:text-[32px] leading-tight font-semibold text-white tracking-tight tabular truncate">{formatRp(saldo)}</p>}
+            {loading ? <div className="skeleton h-9 w-48 rounded-lg mt-1" /> : (
+              <div className="flex items-center gap-2">
+                <p className="text-[28px] sm:text-[32px] leading-tight font-semibold text-white tracking-tight tabular truncate">
+                  {saldoHidden ? 'Rp ••••••' : formatRp(saldo)}
+                </p>
+                <button onClick={() => setSaldoHidden(h => !h)} className="btn btn-ghost btn-icon btn-sm flex-shrink-0"
+                  aria-label={saldoHidden ? 'Tampilkan saldo' : 'Sembunyikan saldo'}>
+                  <Icon name={saldoHidden ? 'eyeOff' : 'eye'} size={16} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <button onClick={() => onNav('saldo')} className="btn btn-secondary hidden sm:inline-flex sm:self-center">
@@ -69,4 +80,5 @@ export function DashboardPage({ orders, saldo, onNav, onDetail, loading }: { ord
       </div>
     </div>
   )
+  return onRefresh ? <PullToRefresh onRefresh={onRefresh}>{body}</PullToRefresh> : body
 }

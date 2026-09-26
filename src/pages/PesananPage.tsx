@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Icon, formatRp, PageHeader, EmptyState, SkeletonRows } from '../ui'
+import { Icon, formatRp, PageHeader, EmptyState, SkeletonRows, PullToRefresh } from '../ui'
 import { type Order } from '../types'
 import { OrderRow } from '../components/Orders'
 
@@ -9,7 +9,7 @@ export const ORDER_FILTERS: { id: 'semua' | Order['status']; label: string }[] =
   { id: 'semua', label: 'Semua' }, { id: 'aktif', label: 'Aktif' }, { id: 'pending', label: 'Pending' }, { id: 'nonaktif', label: 'Nonaktif' },
 ]
 
-export function PesananPage({ orders, onDetail, loading }: { orders: Order[]; onDetail: (o: Order) => void; loading?: boolean }) {
+export function PesananPage({ orders, onDetail, loading, onRefresh }: { orders: Order[]; onDetail: (o: Order) => void; loading?: boolean; onRefresh?: () => Promise<void> | void }) {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<(typeof ORDER_FILTERS)[number]['id']>('semua')
   const query = q.trim().toLowerCase()
@@ -19,7 +19,7 @@ export function PesananPage({ orders, onDetail, loading }: { orders: Order[]; on
   )
   const count = (id: string) => id === 'semua' ? orders.length : orders.filter(o => o.status === id).length
 
-  return (
+  const body = (
     <div className="space-y-6">
       <PageHeader title="Pesanan Saya" subtitle="Riwayat semua pesanan dan status layananmu." />
 
@@ -61,4 +61,5 @@ export function PesananPage({ orders, onDetail, loading }: { orders: Order[]; on
       </div>
     </div>
   )
+  return onRefresh ? <PullToRefresh onRefresh={onRefresh}>{body}</PullToRefresh> : body
 }
