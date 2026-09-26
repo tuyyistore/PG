@@ -39,6 +39,14 @@ export default function App() {
   const routerNavigate = useNavigate()
   const page: Page = pageFromPath(location.pathname) ?? 'dashboard'
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Kunci scroll halaman di belakang saat drawer mobile terbuka, supaya konten
+  // di baliknya tidak ikut bergeser/tabrakan dengan drawer saat discroll.
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const { overflow } = document.body.style
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = overflow }
+  }, [sidebarOpen])
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<Order[]>([])
