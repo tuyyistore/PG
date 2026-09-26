@@ -5,12 +5,10 @@ import { BrandMark, Avatar } from './Brand'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-export function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdmin, onLogout }: {
+export function Sidebar({ open, onClose, activePage, onNav, isAdmin }: {
   open: boolean; onClose: () => void; activePage: string; onNav: (p: string) => void
   user: SessionUser; profile: Row | null; isAdmin: boolean; onLogout: () => void
 }) {
-  const shownUser: SessionUser = profile?.avatar_url ? { ...user, user_metadata: { ...user.user_metadata, avatar_url: profile.avatar_url } } : user
-  const shownName = profile?.full_name || displayName(user)
   const items: { id: string; label: string; icon: IconName }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' as IconName },
     { id: 'produk',    label: 'Produk',    icon: 'package' as IconName },
@@ -59,15 +57,16 @@ export function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdm
         </nav>
 
         <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
-          <div className="flex items-center gap-3 px-2 py-2 rounded-xl">
-            <Avatar user={shownUser} size={36} />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white truncate">{shownName}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-            </div>
-          </div>
-          <button onClick={onLogout} className="nav-item mt-1 hover:!text-[#f87171]">
-            <Icon name="logout" size={18} /><span>Logout</span>
+          <button
+            onClick={() => {
+              const w = window as unknown as { chaport?: { q: (...args: unknown[]) => void } }
+              w.chaport?.q('open')
+              onClose()
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white transition-colors duration-200"
+            style={{ background: '#4f7cff' }}
+          >
+            <Icon name="headset" size={18} /><span>Bantuan Live</span>
           </button>
         </div>
       </aside>
@@ -96,7 +95,6 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
   const shownName = profile?.full_name || displayName(user)
   const menu: { action: string; label: string; icon: IconName }[] = [
     { action: 'My Profile', label: 'Profil Saya', icon: 'user' },
-    { action: 'Settings', label: 'Pengaturan', icon: 'settings' },
     { action: 'Logout', label: 'Logout', icon: 'logout' },
   ]
 
