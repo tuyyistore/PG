@@ -23,7 +23,7 @@ export function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdm
     <>
       {open && <div className="fixed inset-0 z-30 bg-[#050810]/70 backdrop-blur-[2px] lg:hidden" style={{ animation: 'fade-in 200ms' }} onClick={onClose} />}
       <aside
-        className={`fixed top-0 left-0 h-full w-[264px] lg:w-64 z-40 flex flex-col bg-sidebar transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed top-0 bottom-0 left-0 w-[264px] lg:w-64 z-40 flex flex-col bg-sidebar transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
       >
         <div className="h-16 flex items-center justify-between px-5">
@@ -58,7 +58,7 @@ export function Sidebar({ open, onClose, activePage, onNav, user, profile, isAdm
           </div>
         </nav>
 
-        <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="p-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <div className="flex items-center gap-3 px-2 py-2 rounded-xl">
             <Avatar user={shownUser} size={36} />
             <div className="min-w-0 flex-1">
