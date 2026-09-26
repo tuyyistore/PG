@@ -50,7 +50,11 @@ async function dokuRequest(method, path, bodyObj) {
     body: bodyString,
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data?.message?.[0] || data?.error || `DOKU error (${res.status})`)
+  if (!res.ok) {
+    const raw = data?.message ?? data?.error ?? data
+    const msg = Array.isArray(raw) ? raw.map(m => (typeof m === 'string' ? m : JSON.stringify(m))).join('; ') : (typeof raw === 'string' ? raw : JSON.stringify(raw))
+    throw new Error(msg || `DOKU error (${res.status})`)
+  }
   return data
 }
 
