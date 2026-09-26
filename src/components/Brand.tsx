@@ -1,16 +1,15 @@
 import { displayName, type SessionUser } from '../lib/supabase'
+import logo from '../assets/brand/logo.webp'
 
 // ─── Brand ────────────────────────────────────────────────────────────────────
 
 // Ganti nama brand di sini bila perlu.
-export const BRAND_NAME = 'panelbot'
+export const BRAND_NAME = 'TUYYI STORE'
 
 export function BrandMark({ size = 28 }: { size?: number }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex items-center justify-center text-white font-bold tracking-tight" style={{ width: size, height: size, borderRadius: 8, background: '#4f7cff', fontSize: size * 0.46 }}>
-        pb
-      </div>
+      <img src={logo} alt={BRAND_NAME} style={{ width: size, height: size, objectFit: 'contain' }} className="flex-shrink-0" />
       <span className="text-[15px] font-semibold text-white tracking-tight">{BRAND_NAME}</span>
     </div>
   )
