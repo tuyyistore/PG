@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, type Row } from '../lib/supabase'
+import { api, apiFn, type Row } from '../lib/supabase'
 import { Icon, formatRp, ProductThumb, PageHeader } from '../ui'
 import { type CartItem } from '../types'
 
@@ -14,8 +14,12 @@ export function CheckoutPage({ cart, saldo, profile, onBack, onBoughtWithSaldo, 
   async function buyWithSaldo() {
     setBuying(true); setErr('')
     try {
-      await api('rpc/buy_with_saldo', { method: 'POST', body: { item_ids: cart.map(i => i.product.id) } })
+      const orderIds = await api<number[]>('rpc/buy_with_saldo', { method: 'POST', body: { item_ids: cart.map(i => i.product.id) } })
       onBoughtWithSaldo()
+      // Best-effort: ambil serial number otomatis dari Preflix untuk produk yang terhubung.
+      // Tidak memblokir/menggagalkan checkout kalau ini error — order tetap aktif,
+      // admin tinggal isi data akun manual kalau auto-fulfillment gagal.
+      if (orderIds?.length) apiFn('fulfill-order', { method: 'POST', body: { orderIds } }).catch(() => {})
     } catch (e) { setErr('Gagal memproses pembelian. Coba lagi.'); setBuying(false) }
   }
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, uploadFile, type Row } from '../lib/supabase'
+import { api, apiFn, uploadFile, type Row } from '../lib/supabase'
 import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from '../ui'
 import { useConfirm, useToast } from '../feedback'
 
@@ -58,6 +58,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const [orderSearch, setOrderSearch] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
+  const [syncingPreflix, setSyncingPreflix] = useState(false)
   const [detailUser, setDetailUser] = useState<Row | null>(null)
   const [saldoAmount, setSaldoAmount] = useState('')
   const [orderNotes, setOrderNotes] = useState<Record<number, string>>({})
@@ -104,6 +105,15 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
     `ord-${o.id}`.includes(oq) || String(o.id).includes(oq) ||
     (o.product_name ?? '').toLowerCase().includes(oq) || who(o.user_id).toLowerCase().includes(oq)
   )
+
+  const syncPreflix = async () => {
+    setSyncingPreflix(true)
+    try {
+      const r = await apiFn<{ synced: number; categories: number }>('admin-sync-preflix', { method: 'POST' })
+      await load(); onChanged()
+      toast(`Sync selesai: ${r.synced} produk, ${r.categories} kategori dari Preflix.`)
+    } catch (e) { toast((e as Error).message, 'error') } finally { setSyncingPreflix(false) }
+  }
 
   const saveProduct = () => run(async () => {
     if (!form.name.trim() || !Number(form.price)) throw new Error('Nama dan harga wajib diisi')
@@ -221,6 +231,12 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                       <Icon name="copy" size={14} /> Salin ID
                     </button>
                   </div>
+                  {o.fulfillment_status === 'failed' && (
+                    <div className="alert alert-danger"><Icon name="info" size={14} className="mt-0.5" /><span>Auto-fulfillment Preflix gagal — isi data akun manual di bawah.</span></div>
+                  )}
+                  {o.fulfillment_status === 'pending' && (
+                    <div className="alert alert-warning"><Icon name="clock" size={14} className="mt-0.5" /><span>Menunggu serial number otomatis dari Preflix...</span></div>
+                  )}
                   {(o.buyer_whatsapp || o.buyer_contact_email) && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Icon name="mail" size={13} /> Kontak: {o.buyer_contact_email ?? '-'}{o.buyer_whatsapp ? ` · WA ${o.buyer_whatsapp}` : ''}</p>
                   )}
@@ -310,9 +326,16 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
           </div>
 
           <div className="card overflow-hidden">
-            <div className="px-4 sm:px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="section-title">Daftar produk</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{d.products.length} produk</p>
+            <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div>
+                <p className="section-title">Daftar produk</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{d.products.length} produk</p>
+              </div>
+              <Btn onClick={syncPreflix} variant="secondary" disabled={syncingPreflix}>
+                {syncingPreflix
+                  ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Sync...</>
+                  : <><Icon name="refresh" size={14} /> Sync dari Preflix</>}
+              </Btn>
             </div>
             {d.products.length === 0 && <EmptyState icon="package" title="Belum ada produk." description="Tambahkan produk pertama lewat form di atas." />}
             <div className="divide-y divide-white/[0.06]">
@@ -320,7 +343,10 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                 <div key={p.id} className="px-4 sm:px-5 py-3.5 flex items-center gap-3 flex-wrap sm:flex-nowrap">
                   <ProductThumb url={p.logo_url} size={40} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">{p.name}</p>
+                    <p className="text-sm font-medium text-white truncate flex items-center gap-1.5">
+                      {p.name}
+                      {p.supplier === 'preflix' && <span className="badge badge-neutral" style={{ fontSize: 10 }}>Preflix{typeof p.supplier_stock === 'number' ? ` · stok ${p.supplier_stock}` : ''}</span>}
+                    </p>
                     <p className="text-xs text-muted-foreground tabular">{p.category} · {formatRp(p.price)}{p.period}</p>
                   </div>
                   <div className="flex items-center gap-1.5 ml-auto">
