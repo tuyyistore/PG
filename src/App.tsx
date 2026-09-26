@@ -207,9 +207,11 @@ export default function App() {
       <main className="lg:pl-64 pt-16">
         <div key={page} className={`page-enter max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 ${cart.length > 0 && page !== 'checkout' ? 'pb-36' : 'pb-24'}`}>
         {notice && <div className="alert alert-danger mb-6"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{notice}</span></div>}
-        {page === 'dashboard' && <DashboardPage orders={orders} saldo={saldo} onNav={p => navigate(p)} onDetail={setDetailOrder} loading={!mineLoaded} />}
+        {page === 'dashboard' && <DashboardPage orders={orders} saldo={saldo} onNav={p => navigate(p)} onDetail={setDetailOrder} loading={!mineLoaded}
+          onRefresh={session ? () => loadMine(session.user.id) : undefined} />}
         {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} loading={!catalogLoaded} />}
-        {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} loading={!mineLoaded} />}
+        {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} loading={!mineLoaded}
+          onRefresh={session ? () => loadMine(session.user.id) : undefined} />}
         {page === 'saldo'     && <SaldoPage saldo={saldo} onPaid={handlePaid} userId={session!.user.id} />}
         {page === 'checkout'  && <CheckoutPage cart={cart} saldo={saldo} profile={profile} onBack={() => navigate('produk')}
           onBoughtWithSaldo={handleCheckoutDone} onGoTopUp={() => navigate('saldo')} />}

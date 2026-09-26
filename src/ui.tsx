@@ -1,3 +1,4 @@
+import { useRef, useState, type ReactNode } from 'react'
 import type React from 'react'
 
 // ─── Icons (inline SVG, gaya Lucide — tanpa dependensi tambahan) ──────────────
@@ -34,6 +35,7 @@ export const ICON_PATHS = {
   trash: <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />,
   edit: <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />,
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
+  eyeOff: <><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></>,
   phone: <path d="M13.4 2.6a2 2 0 0 0-2.8 0L8.7 4.5a2 2 0 0 0-.5 2c.4 1.6 1.3 3.7 3.2 5.6s4 2.8 5.6 3.2a2 2 0 0 0 2-.5l1.9-1.9a2 2 0 0 0 0-2.8l-2-2a2 2 0 0 0-2.2-.4l-1 .4c-.7-.5-1.4-1.1-2-1.8-.7-.6-1.3-1.3-1.8-2l.4-1a2 2 0 0 0-.4-2.2z" />,
   image: <><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></>,
   tag: <><path d="M12.6 2H4a2 2 0 0 0-2 2v8.6a2 2 0 0 0 .59 1.41l8.6 8.6a2 2 0 0 0 2.82 0l8-8a2 2 0 0 0 0-2.82l-8.6-8.6A2 2 0 0 0 12.6 2Z" /><circle cx="7.5" cy="7.5" r="1.5" /></>,
@@ -162,4 +164,49 @@ export function SkeletonRows({ rows = 3, thumb = 40 }: { rows?: number; thumb?: 
 
 export function SkeletonCard({ height = 80 }: { height?: number }) {
   return <div className="card skeleton" style={{ height }} aria-hidden="true" />
+}
+
+// Pull-to-refresh sederhana untuk mobile: hanya aktif saat halaman sudah di paling atas,
+// menahan/melepas via touch, lalu memanggil onRefresh saat ditarik cukup jauh.
+const PTR_TRIGGER = 64
+export function PullToRefresh({ onRefresh, children }: { onRefresh: () => Promise<void> | void; children: ReactNode }) {
+  const [pull, setPull] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const startY = useRef<number | null>(null)
+
+  function onTouchStart(e: React.TouchEvent) {
+    if (window.scrollY > 0 || refreshing) { startY.current = null; return }
+    startY.current = e.touches[0].clientY
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (startY.current === null) return
+    const dy = e.touches[0].clientY - startY.current
+    if (dy > 0) setPull(Math.min(dy * 0.5, PTR_TRIGGER * 1.4))
+  }
+  async function onTouchEnd() {
+    if (pull >= PTR_TRIGGER) {
+      setRefreshing(true)
+      setPull(PTR_TRIGGER)
+      try { await onRefresh() } finally { setRefreshing(false); setPull(0) }
+    } else {
+      setPull(0)
+    }
+    startY.current = null
+  }
+
+  return (
+    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="lg:contents">
+      <div
+        className="flex items-center justify-center overflow-hidden lg:hidden"
+        style={{ height: pull, transition: startY.current === null ? 'height 200ms ease-out' : undefined }}
+        aria-hidden="true"
+      >
+        <span
+          className={`w-5 h-5 rounded-full border-2 border-slate-700 border-t-[#4f7cff] ${refreshing || pull >= PTR_TRIGGER ? 'animate-spin' : ''}`}
+          style={{ opacity: Math.min(pull / PTR_TRIGGER, 1), transform: `rotate(${pull * 3}deg)` }}
+        />
+      </div>
+      {children}
+    </div>
+  )
 }
