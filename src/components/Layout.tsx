@@ -123,9 +123,11 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
       </div>
 
       <div className="flex items-center gap-1.5">
-        <button onClick={onSettingsClick} aria-label="Pengaturan" className="btn btn-ghost btn-icon">
-          <Icon name="settings" size={18} />
-        </button>
+        {user && (
+          <button onClick={onSettingsClick} aria-label="Pengaturan" className="btn btn-ghost btn-icon">
+            <Icon name="settings" size={18} />
+          </button>
+        )}
 
         {user ? (
           <div className="relative">
@@ -156,7 +158,7 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
             )}
           </div>
         ) : (
-          <button onClick={onLoginClick} className="btn btn-primary btn-sm">
+          <button onClick={onLoginClick} className="btn btn-primary btn-sm" style={{ border: '1px solid rgba(255,255,255,0.18)' }}>
             <Icon name="user" size={16} /> Masuk
           </button>
         )}
