@@ -19,13 +19,18 @@ import AdminPage from './pages/AdminPage'
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 
-type Page = 'dashboard' | 'produk' | 'pesanan' | 'saldo' | 'checkout' | 'profile' | 'admin'
+type Page = 'dashboard' | 'produk' | 'pesanan' | 'saldo' | 'checkout' | 'profile' | 'admin' | 'login'
+
+// Halaman yang wajib login. Dashboard & Produk bisa dibuka tanpa login supaya
+// pengunjung baru bisa langsung lihat-lihat; begitu mau top up atau checkout,
+// baru diarahkan ke halaman Masuk.
+const PROTECTED: Page[] = ['pesanan', 'saldo', 'checkout', 'profile', 'admin']
 
 // Setiap halaman punya URL sendiri, jadi bisa di-refresh, dibagikan, dan tombol "kembali" browser
 // berpindah antar-menu. vercel.json sudah me-rewrite semua path ke index.html.
 const PATHS: Record<Page, string> = {
   dashboard: '/', produk: '/produk', pesanan: '/pesanan', saldo: '/topup',
-  checkout: '/checkout', profile: '/pengaturan', admin: '/admin',
+  checkout: '/checkout', profile: '/pengaturan', admin: '/admin', login: '/login',
 }
 const pageFromPath = (path: string): Page | null => {
   const clean = path.replace(/\/+$/, '') || '/'
@@ -37,7 +42,10 @@ export default function App() {
   const [booting, setBooting] = useState(true)
   const location = useLocation()
   const routerNavigate = useNavigate()
-  const page: Page = pageFromPath(location.pathname) ?? 'dashboard'
+  const rawPage: Page = pageFromPath(location.pathname) ?? 'dashboard'
+  // Halaman yang tampil dianggap "Masuk" begitu halaman itu butuh login dan user belum login,
+  // jadi tidak sempat kelihatan sekilas sebelum redirect URL-nya menyusul lewat effect di bawah.
+  const [pendingPage, setPendingPage] = useState<Page>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   // Kunci scroll halaman di belakang saat drawer mobile terbuka, supaya konten
   // di baliknya tidak ikut bergeser/tabrakan dengan drawer saat discroll.
@@ -60,14 +68,29 @@ export default function App() {
   const [mineLoaded, setMineLoaded] = useState(false)
 
   const isAdmin = session?.user.email?.toLowerCase() === ADMIN_EMAIL
-  useEffect(() => { document.title = session ? `${PAGE_TITLES[page] ?? 'Dashboard'} · ${BRAND_NAME}` : `Masuk · ${BRAND_NAME}` }, [page, session])
+  // Halaman terproteksi dianggap 'login' saat render walau URL belum sempat diganti,
+  // supaya kontennya tidak sempat kelihatan sekilas sebelum redirect.
+  const page: Page = (PROTECTED.includes(rawPage) && !session) ? 'login' : rawPage
+  useEffect(() => { document.title = page === 'login' ? `Masuk · ${BRAND_NAME}` : `${PAGE_TITLES[page] ?? 'Dashboard'} · ${BRAND_NAME}` }, [page])
   const fail = (e: unknown) => setNotice((e as Error).message)
   const toast = useToast()
 
   function navigate(p: string, opts?: { replace?: boolean }) {
-    const next = PATHS[p as Page] ?? '/'
+    let target = p as Page
+    // Coba buka halaman yang wajib login tanpa sesi → lempar ke Masuk dulu,
+    // lalu balik ke halaman tujuan itu begitu login berhasil.
+    if (PROTECTED.includes(target) && !session) {
+      setPendingPage(target)
+      target = 'login'
+    }
+    const next = PATHS[target] ?? '/'
     if (next !== location.pathname) routerNavigate(next, opts)
     window.scrollTo(0, 0)
+  }
+
+  function requireLogin() {
+    setPendingPage(page === 'login' ? 'dashboard' : page)
+    navigate('login')
   }
 
   async function loadProducts() {
@@ -100,18 +123,23 @@ export default function App() {
     }).finally(() => setBooting(false))
     refreshCatalog()
   }, [])
-  useEffect(() => { if (session) loadMine(session.user.id) }, [session?.user.id])
+  useEffect(() => { if (session) loadMine(session.user.id); else setMineLoaded(true) }, [session?.user.id])
 
   // Jaga URL tetap valid: path tak dikenal / admin untuk non-admin → Dashboard,
+  // halaman yang wajib login tanpa sesi (akses langsung lewat URL / tombol back) → Masuk,
   // checkout dengan keranjang kosong (mis. setelah refresh) → Produk.
   useEffect(() => {
-    if (booting || !session) return
+    if (booting) return
     const known = pageFromPath(location.pathname)
-    if (!known || (known === 'admin' && !isAdmin)) navigate('dashboard', { replace: true })
-    else if (known === 'checkout' && cart.length === 0) navigate('produk', { replace: true })
-  }, [location.pathname, booting, session, isAdmin, cart.length]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!known || (known === 'admin' && !isAdmin)) { navigate('dashboard', { replace: true }); return }
+    if (known === 'login') { if (session) navigate(pendingPage, { replace: true }); return }
+    if (PROTECTED.includes(known) && !session) { setPendingPage(known); navigate('login', { replace: true }); return }
+    if (known === 'checkout' && cart.length === 0) navigate('produk', { replace: true })
+  }, [location.pathname, booting, session, isAdmin, cart.length, pendingPage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addToCart(p: Product) {
+    // Lihat-lihat produk boleh tanpa akun, tapi begitu mau beli wajib login dulu.
+    if (!session) { requireLogin(); toast('Silakan masuk dulu untuk membeli produk'); return }
     setCart(prev => prev.find(i => i.product.id === p.id) ? prev : [...prev, { product: p, qty: 1 }])
     toast(`${p.name} ditambahkan ke keranjang`)
   }
@@ -141,7 +169,7 @@ export default function App() {
       Memuat...
     </div>
   )
-  if (!session) return <LoginPage onAuthed={setSession} />
+  if (page === 'login') return <LoginPage onAuthed={s => { setSession(s); navigate(pendingPage, { replace: true }) }} />
 
   return (
     <div
@@ -153,7 +181,8 @@ export default function App() {
         onProfileClick={e => { e.stopPropagation(); setDropdownOpen(d => !d) }}
         showDropdown={dropdownOpen}
         onSettingsClick={() => navigate('profile')}
-        user={session.user}
+        onLoginClick={requireLogin}
+        user={session?.user ?? null}
         profile={profile}
         page={page}
         onProfileAction={a => {
@@ -168,7 +197,8 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         activePage={page}
         onNav={p => navigate(p)}
-        user={session.user}
+        onLoginClick={requireLogin}
+        user={session?.user ?? null}
         profile={profile}
         isAdmin={isAdmin}
         onLogout={logout}
@@ -180,10 +210,10 @@ export default function App() {
         {page === 'dashboard' && <DashboardPage orders={orders} saldo={saldo} onNav={p => navigate(p)} onDetail={setDetailOrder} loading={!mineLoaded} />}
         {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} loading={!catalogLoaded} />}
         {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} loading={!mineLoaded} />}
-        {page === 'saldo'     && <SaldoPage saldo={saldo} onPaid={handlePaid} userId={session.user.id} />}
+        {page === 'saldo'     && <SaldoPage saldo={saldo} onPaid={handlePaid} userId={session!.user.id} />}
         {page === 'checkout'  && <CheckoutPage cart={cart} saldo={saldo} profile={profile} onBack={() => navigate('produk')}
           onBoughtWithSaldo={handleCheckoutDone} onGoTopUp={() => navigate('saldo')} />}
-        {page === 'profile'   && <ProfilePage user={session.user} isAdmin={isAdmin} profile={profile} onSaved={patch => setProfile(pr => ({ ...(pr ?? {}), ...patch }))} />}
+        {page === 'profile'   && <ProfilePage user={session!.user} isAdmin={isAdmin} profile={profile} onSaved={patch => setProfile(pr => ({ ...(pr ?? {}), ...patch }))} />}
         {page === 'admin' && isAdmin && <AdminPage onChanged={refreshCatalog} />}
         </div>
       </main>
