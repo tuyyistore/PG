@@ -1,6 +1,6 @@
 import logoQris from '../assets/payments/qris.svg'
 import { useEffect, useState } from 'react'
-import { api, type Row } from '../lib/supabase'
+import { api, apiFn, type Row } from '../lib/supabase'
 import { Icon, formatRp, PageHeader, EmptyState, StatusBadge, SkeletonRows } from '../ui'
 import { QRISModal } from '../components/QRISModal'
 import { PaymentMethodsCard } from '../components/PaymentMethods'
@@ -14,21 +14,21 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
 
   const [nominal, setNominal] = useState<number | null>(null)
   const [custom, setCustom] = useState('')
-  const [payment, setPayment] = useState<{ id: number; amount: number; expiresAt?: number } | null>(null)
+  const [payment, setPayment] = useState<{ id: number; amount: number; url: string; expiresAt?: number } | null>(null)
   const presets = [10000, 25000, 50000, 100000, 250000, 500000]
   const finalNominal = nominal ?? Number(custom.replace(/\D/g, ''))
 
   const [creating, setCreating] = useState(false)
   const [payErr, setPayErr] = useState('')
 
-  // Nominal unik (kode 1–99) dibuat & divalidasi di server lewat RPC `create_topup_payment`
-  // (lihat supabase/migration_v4.sql) — klien hanya mengirim nominal dasar.
+  // Payment dibuat & divalidasi di server lewat /api/create-payment, yang juga
+  // memanggil DOKU untuk mendapatkan halaman QRIS-nya (lihat api/create-payment.js).
   async function startPayment() {
     if (finalNominal <= 0 || creating) return
     setCreating(true); setPayErr('')
     try {
-      const row = await api<Row>('rpc/create_topup_payment', { method: 'POST', body: { base_amount: finalNominal } })
-      setPayment({ id: Number(row.id), amount: Number(row.amount), expiresAt: row.created_at ? new Date(row.created_at).getTime() + 60 * 60 * 1000 : undefined })
+      const row = await apiFn<{ id: number; amount: number; url: string; expiresAt?: number }>('create-payment', { method: 'POST', body: { kind: 'topup', amount: finalNominal } })
+      setPayment(row)
     } catch (e) { setPayErr((e as Error).message || 'Gagal membuat pembayaran. Coba lagi.') } finally { setCreating(false) }
   }
 
@@ -108,7 +108,7 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
               ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Membuat QRIS...</>
               : <><Icon name="qr" size={18} /> Bayar via QRIS · {finalNominal > 0 ? formatRp(finalNominal) : '—'}</>}
           </button>
-          <p className="hint mt-3 text-center">Nominal unik ditambahkan otomatis. Saldo bertambah setelah top up dikonfirmasi.</p>
+          <p className="hint mt-3 text-center">Saldo bertambah otomatis setelah top up dikonfirmasi.</p>
         </div>
       </div>
 
@@ -141,7 +141,7 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
       </div>
 
       {payment && (
-        <QRISModal total={payment.amount} paymentId={payment.id} expiresAt={payment.expiresAt} onClose={() => setPayment(null)}
+        <QRISModal total={payment.amount} paymentId={payment.id} paymentUrl={payment.url} expiresAt={payment.expiresAt} onClose={() => setPayment(null)}
           onDone={() => { onPaid(); loadHistory(); setPayment(null); setNominal(null); setCustom('') }} />
       )}
     </div>

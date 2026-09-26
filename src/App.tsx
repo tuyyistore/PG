@@ -144,7 +144,7 @@ export default function App() {
     toast(`${p.name} ditambahkan ke keranjang`)
   }
 
-  // Order/topup sudah ditulis backend (api/check-payment.js) begitu pembayaran GoBiz terdeteksi cocok —
+  // Order/topup sudah ditulis backend (api/check-payment.js) begitu pembayaran DOKU terdeteksi sukses —
   // di sini tinggal muat ulang data terbaru dari Supabase.
   async function handleCheckoutDone() {
     navigate('dashboard')

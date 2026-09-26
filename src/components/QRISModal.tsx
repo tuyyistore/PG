@@ -2,9 +2,8 @@ import logoQris from '../assets/payments/qris.svg'
 import { useEffect, useState } from 'react'
 import { Icon, formatRp } from '../ui'
 import { useToast, playSuccessSound } from '../feedback'
-import { buildDynamicQris } from '../lib/qris'
 
-// ─── QRIS Modal ───────────────────────────────────────────────────────────────
+// ─── QRIS Modal (checkout QRIS di-embed langsung dari DOKU) ───────────────────
 
 export function useCountdown(until?: number) {
   const [now, setNow] = useState(() => Date.now())
@@ -18,7 +17,7 @@ export function useCountdown(until?: number) {
   return { left, label: `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}` }
 }
 
-export function QRISModal({ total, paymentId, expiresAt, onClose, onDone }: { total: number; paymentId: number; expiresAt?: number; onClose: () => void; onDone: () => void }) {
+export function QRISModal({ total, paymentId, paymentUrl, expiresAt, onClose, onDone }: { total: number; paymentId: number; paymentUrl: string; expiresAt?: number; onClose: () => void; onDone: () => void }) {
   const toast = useToast()
   const countdown = useCountdown(expiresAt)
   const copyAmount = async () => {
@@ -26,20 +25,7 @@ export function QRISModal({ total, paymentId, expiresAt, onClose, onDone }: { to
     catch { toast('Gagal menyalin nominal', 'error') }
   }
   const [done, setDone] = useState(false)
-  const [qrUrl, setQrUrl] = useState('')
   const [warn, setWarn] = useState('')
-
-  useEffect(() => {
-    let stop = false
-    const staticQris = (import.meta.env?.VITE_QRIS_STATIC_STRING as string | undefined) ?? ''
-    if (staticQris) {
-      import('qrcode').then(QRCode => {
-        const payload = buildDynamicQris(staticQris, total)
-        QRCode.toDataURL(payload, { margin: 1, width: 320 }).then(url => { if (!stop) setQrUrl(url) })
-      })
-    }
-    return () => { stop = true }
-  }, [total])
 
   useEffect(() => {
     if (done) return
@@ -87,7 +73,7 @@ export function QRISModal({ total, paymentId, expiresAt, onClose, onDone }: { to
 
         <div className="p-5 space-y-4">
           <div className="text-center">
-            <p className="eyebrow">Total pembayaran (nominal unik)</p>
+            <p className="eyebrow">Total pembayaran</p>
             <div className="flex items-center justify-center gap-2 mt-1">
               <p className="text-[28px] leading-9 font-semibold text-white tracking-tight tabular">{formatRp(total)}</p>
               <button onClick={copyAmount} className="btn btn-ghost btn-icon btn-sm" aria-label="Salin nominal" title="Salin nominal"><Icon name="copy" size={16} /></button>
@@ -100,18 +86,14 @@ export function QRISModal({ total, paymentId, expiresAt, onClose, onDone }: { to
             )}
           </div>
 
-          <div className="bg-white rounded-2xl p-5 flex flex-col items-center justify-center min-h-[232px]">
-            {qrUrl ? (
-              <img src={qrUrl} alt="QRIS" width={196} height={196} className="rounded-md" />
-            ) : (
-              <p className="text-xs text-center px-4 text-slate-500">QRIS statis belum diatur (VITE_QRIS_STATIC_STRING).</p>
-            )}
-            <img src={logoQris} alt="QRIS" className="h-4 mt-4 object-contain" />
+          <div className="bg-white rounded-2xl p-3 flex flex-col items-center justify-center min-h-[300px]">
+            <iframe src={paymentUrl} title="Bayar QRIS via DOKU" className="w-full rounded-md border-0" style={{ minHeight: 280 }} />
+            <img src={logoQris} alt="QRIS" className="h-4 mt-3 object-contain" />
           </div>
 
           <div className="alert alert-warning">
             <Icon name="info" size={16} className="mt-0.5" />
-            <span>Bayar persis sesuai nominal ini ya, termasuk 2 digit terakhir.</span>
+            <span>Bayar persis sesuai nominal ini ya.</span>
           </div>
 
           <p className="hint text-center">Scan via GoPay · OVO · Dana · BCA · Mandiri</p>

@@ -1,6 +1,17 @@
 # Ringkasan Perubahan
 
 ## ⚠️ Wajib dijalankan dulu sebelum deploy
+
+0. `supabase/migration_v8.sql` — **baru**, mengganti payment gateway QRIS dari GoBiz
+   (polling histori transaksi GoPay Merchant + nominal unik kode 1-99) ke **DOKU**
+   (Checkout API, dilacak lewat `invoice_number` sendiri — nominal unik tidak diperlukan
+   lagi). Hapus RPC `create_topup_payment` (digantikan `api/create-payment.js`), ganti
+   `gobiz_claimed_tx`/`gobiz_session` jadi `doku_claimed_tx`. **Wajib jalan bersamaan
+   dengan deploy kode terbaru**, dan isi environment variable Vercel `DOKU_CLIENT_ID` +
+   `DOKU_SECRET_KEY` (dari DOKU Back Office) — tanpa ini tombol "Bayar via QRIS" gagal.
+   Hapus juga env lama yang sudah tidak dipakai: `GOPAY_TOKEN`, `GOPAY_MERCHANT_ID`,
+   `VITE_QRIS_STATIC_STRING`.
+
 Buka **Supabase → SQL Editor**, jalankan berurutan (sekali saja, kalau belum pernah):
 1. `supabase/migration_v2.sql` — menambahkan kolom/tabel WhatsApp, email kontak, data akun
    pesanan, kategori, logo produk, fungsi admin tambah/refund saldo, dan bucket Storage
