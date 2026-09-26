@@ -1,7 +1,7 @@
 import logoQris from '../assets/payments/qris.svg'
 import { useEffect, useState } from 'react'
 import { Icon, formatRp } from '../ui'
-import { useToast } from '../feedback'
+import { useToast, playSuccessSound } from '../feedback'
 import { buildDynamicQris } from '../lib/qris'
 
 // ─── QRIS Modal ───────────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ export function QRISModal({ total, paymentId, expiresAt, onClose, onDone }: { to
       try {
         const r = await fetch(`/api/check-payment?paymentId=${paymentId}`)
         const d = await r.json()
-        if (d.status === 'paid') setDone(true)
+        if (d.status === 'paid') { setDone(true); playSuccessSound() }
         else if (d.status === 'expired') setWarn('QRIS ini sudah kedaluwarsa, tutup dan ulangi.')
         else if (d.warning) setWarn(d.warning)
       } catch { /* diamkan, coba lagi di interval berikutnya */ }
