@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ADMIN_EMAIL, api, initSession, signOut, type Row, type Session } from './lib/supabase'
 import { Icon } from './ui'
-import { useToast } from './feedback'
+import { useToast, playSuccessSound } from './feedback'
 import { type Product, type CartItem, type Order } from './types'
 import { rowToProduct, rowToOrder } from './lib/mappers'
 import { BRAND_NAME } from './components/Brand'
@@ -121,6 +121,7 @@ export default function App() {
   async function handleCheckoutDone() {
     navigate('dashboard')
     setCart([])
+    playSuccessSound()
     toast('Pembelian berhasil. Pesanan sudah aktif di Produk Saya.')
     try { await loadMine(session!.user.id) } catch (e) { fail(e) }
   }

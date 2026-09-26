@@ -2,6 +2,35 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon } from './ui'
 
+// ─── Suara notifikasi berhasil ─────────────────────────────────────────────────
+// Dibuat langsung lewat Web Audio API (2 nada naik, seperti "ting-ting" khas notifikasi
+// sukses) — tidak perlu file audio eksternal, jadi tidak akan gagal build/hilang saat deploy.
+
+export function playSuccessSound() {
+  try {
+    type AudioCtor = typeof AudioContext
+    const w = window as unknown as { AudioContext?: AudioCtor; webkitAudioContext?: AudioCtor }
+    const AudioCtx = w.AudioContext || w.webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+    const notes = [880, 1318.51] // A5 → E6, interval naik yang terdengar "berhasil"
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const start = ctx.currentTime + i * 0.12
+      gain.gain.setValueAtTime(0, start)
+      gain.gain.linearRampToValueAtTime(0.28, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(start)
+      osc.stop(start + 0.34)
+    })
+    setTimeout(() => ctx.close(), 700)
+  } catch { /* abaikan bila audio diblokir/tidak didukung browser */ }
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 type ToastKind = 'success' | 'error' | 'info'
