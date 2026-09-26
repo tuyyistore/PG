@@ -116,11 +116,11 @@ export function PageHeader({ title, subtitle, actions, leading }: { title: strin
   )
 }
 
-export function EmptyState({ icon = 'package', title, description, action }: { icon?: IconName; title: string; description?: string; action?: React.ReactNode }) {
+export function EmptyState({ icon = 'package', title, description, action }: { icon?: IconName; title?: string; description?: string; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 px-6">
       <div className="icon-tile mb-4" style={{ width: 48, height: 48, borderRadius: 14 }}><Icon name={icon} size={22} /></div>
-      <p className="text-sm font-medium text-white">{title}</p>
+      {title && <p className="text-sm font-medium text-white">{title}</p>}
       {description && <p className="hint mt-1 max-w-xs">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
