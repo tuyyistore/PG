@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, SkeletonCard } from '../ui'
 import { type Product, type CartItem } from '../types'
 
@@ -68,15 +68,6 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
   const filtered = tab === 'Semua' ? products : products.filter(p => p.category === tab)
   const cartIds = new Set(cart.map(i => i.product.id))
 
-  // Petunjuk geser: muncul sebentar saat halaman dibuka lalu hilang otomatis
-  // setelah 2 detik, supaya user tahu daftar produk bisa digeser untuk ganti kategori.
-  const [hintVisible, setHintVisible] = useState(true)
-  useEffect(() => {
-    if (tabs.length <= 1) return
-    const t = setTimeout(() => setHintVisible(false), 2000)
-    return () => clearTimeout(t)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Geser kiri/kanan di area produk untuk pindah kategori, tanpa perlu menekan tab-nya.
   const touchStart = useRef<{ x: number; y: number } | null>(null)
   function onTouchStart(e: React.TouchEvent) {
@@ -92,7 +83,6 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
     const idx = tabs.indexOf(tab)
     if (dx < 0 && idx < tabs.length - 1) setTab(tabs[idx + 1]) // geser ke kiri → kategori berikutnya
     else if (dx > 0 && idx > 0) setTab(tabs[idx - 1]) // geser ke kanan → kategori sebelumnya
-    setHintVisible(false)
   }
 
   return (
@@ -101,21 +91,10 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
       <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
         <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
           {tabs.map(t => (
-            <button key={t} onClick={() => { setTab(t); setHintVisible(false) }} className={`chip ${tab === t ? 'chip-active' : ''}`}>{t}</button>
+            <button key={t} onClick={() => setTab(t)} className={`chip ${tab === t ? 'chip-active' : ''}`}>{t}</button>
           ))}
         </div>
       </div>
-
-      {tabs.length > 1 && (
-        <div
-          className={`flex items-center justify-center gap-2 -mt-2 text-xs text-subtle transition-opacity duration-300 ${hintVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          aria-hidden="true"
-        >
-          <Icon name="chevronRight" size={14} className="swipe-hint-arrow rotate-180" />
-          <span>Geser untuk ganti kategori</span>
-          <Icon name="chevronRight" size={14} className="swipe-hint-arrow" style={{ animationDelay: '0.35s' }} />
-        </div>
-      )}
 
       <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {loading ? (

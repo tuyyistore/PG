@@ -59,7 +59,7 @@ export function DashboardPage({ orders, saldo, onNav, onDetail, loading }: { ord
         </div>
 
         {loading ? <SkeletonRows rows={3} /> : orders.length === 0 ? (
-          <EmptyState icon="server" title="Belum ada server untuk ditampilkan" description="Produk yang kamu beli akan muncul di sini."
+          <EmptyState icon="package" description="Produk yang kamu beli akan muncul di sini."
             action={<button onClick={() => onNav('produk')} className="btn btn-primary btn-sm"><Icon name="plus" size={14} /> Beli Produk</button>} />
         ) : (
           <div className="divide-y divide-white/[0.06]">
