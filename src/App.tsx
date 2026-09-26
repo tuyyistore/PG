@@ -141,7 +141,7 @@ export default function App() {
       Memuat...
     </div>
   )
-  if (!session) return <LoginPage />
+  if (!session) return <LoginPage onAuthed={setSession} />
 
   return (
     <div
