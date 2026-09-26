@@ -1,4 +1,4 @@
-import { displayName, type Row, type SessionUser } from '../lib/supabase'
+import { displayName, displayHandle, type Row, type SessionUser } from '../lib/supabase'
 import { Icon, formatRp, type IconName } from '../ui'
 import { type CartItem } from '../types'
 import { BrandMark, Avatar } from './Brand'
@@ -136,7 +136,7 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
               onClick={e => e.stopPropagation()}>
               <div className="px-3 py-2.5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <p className="text-sm font-medium text-white truncate">{shownName}</p>
-                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{displayHandle(user)}</p>
               </div>
               {menu.map(m => (
                 <button key={m.action} onClick={() => onProfileAction(m.action)} role="menuitem"
