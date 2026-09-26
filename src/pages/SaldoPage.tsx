@@ -1,9 +1,8 @@
-import logoQris from '../assets/payments/qris.svg'
 import { useEffect, useState } from 'react'
 import { api, apiFn, type Row } from '../lib/supabase'
 import { Icon, formatRp, PageHeader, EmptyState, StatusBadge, SkeletonRows } from '../ui'
 import { QRISModal } from '../components/QRISModal'
-import { PaymentMethodsCard } from '../components/PaymentMethods'
+import { PaymentMethodsCard, PaymentMethodBadge, PAYMENT_METHOD_OPTIONS, type PaymentMethodOption } from '../components/PaymentMethods'
 
 // ─── Saldo Page ───────────────────────────────────────────────────────────────
 
@@ -14,7 +13,9 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
 
   const [nominal, setNominal] = useState<number | null>(null)
   const [custom, setCustom] = useState('')
-  const [payment, setPayment] = useState<{ id: number; amount: number; url: string; expiresAt?: number } | null>(null)
+  const [methodId, setMethodId] = useState<string>('qris')
+  const selectedMethod = PAYMENT_METHOD_OPTIONS.find(m => m.id === methodId) ?? PAYMENT_METHOD_OPTIONS[0]
+  const [payment, setPayment] = useState<{ id: number; amount: number; url: string; expiresAt?: number; method: PaymentMethodOption } | null>(null)
   const presets = [10000, 25000, 50000, 100000, 250000, 500000]
   const finalNominal = nominal ?? Number(custom.replace(/\D/g, ''))
 
@@ -22,19 +23,20 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
   const [payErr, setPayErr] = useState('')
 
   // Payment dibuat & divalidasi di server lewat /api/create-payment, yang juga
-  // memanggil DOKU untuk mendapatkan halaman QRIS-nya (lihat api/create-payment.js).
+  // memanggil DOKU untuk mendapatkan halaman pembayarannya sesuai metode yang
+  // dipilih (QRIS, VA bank, atau e-wallet langsung) — lihat api/create-payment.js.
   async function startPayment() {
     if (finalNominal <= 0 || creating) return
     setCreating(true); setPayErr('')
     try {
-      const row = await apiFn<{ id: number; amount: number; url: string; expiresAt?: number }>('create-payment', { method: 'POST', body: { kind: 'topup', amount: finalNominal } })
-      setPayment(row)
+      const row = await apiFn<{ id: number; amount: number; url: string; expiresAt?: number; method: string }>('create-payment', { method: 'POST', body: { kind: 'topup', amount: finalNominal, method: methodId } })
+      setPayment({ ...row, method: PAYMENT_METHOD_OPTIONS.find(m => m.id === row.method) ?? selectedMethod })
     } catch (e) { setPayErr((e as Error).message || 'Gagal membuat pembayaran. Coba lagi.') } finally { setCreating(false) }
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Top Up Saldo" subtitle="Isi saldo instan lewat QRIS — terverifikasi otomatis." />
+      <PageHeader title="Top Up Saldo" subtitle="Isi saldo instan lewat QRIS, e-wallet, atau Virtual Account — terverifikasi otomatis." />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 lg:gap-6 items-start">
         {/* Left column */}
@@ -71,17 +73,30 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
               <h2 className="section-title">Metode pembayaran</h2>
               <span className="text-xs text-muted-foreground">Langkah 2 dari 2</span>
             </div>
-            <div className="option option-active px-4 py-3.5 flex items-center gap-4">
-              <div className="w-12 h-9 rounded-lg bg-white flex items-center justify-center flex-shrink-0 px-1.5">
-                <img src={logoQris} alt="QRIS" className="max-h-4 max-w-full object-contain" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white">QRIS</p>
-                <p className="text-xs text-muted-foreground truncate">E-wallet &amp; semua m-banking</p>
-              </div>
-              <span className="badge badge-primary">Otomatis</span>
+            <div className="space-y-4">
+              {(['Otomatis', 'E-Wallet', 'Virtual Account'] as const).map(group => (
+                <div key={group}>
+                  <p className="eyebrow mb-2">{group === 'Otomatis' ? 'Direkomendasikan' : group}</p>
+                  <div className="space-y-2">
+                    {PAYMENT_METHOD_OPTIONS.filter(m => m.group === group).map(m => (
+                      <button key={m.id} onClick={() => setMethodId(m.id)}
+                        className={`option w-full px-4 py-3.5 flex items-center gap-4 text-left ${methodId === m.id ? 'option-active' : ''}`}>
+                        <PaymentMethodBadge option={m} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white">{m.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{m.hint}</p>
+                        </div>
+                        {m.group === 'Otomatis' && methodId !== m.id && <span className="badge badge-primary">Otomatis</span>}
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors duration-200 ${methodId === m.id ? 'bg-[#4f7cff]' : ''}`} style={methodId === m.id ? undefined : { border: '1.5px solid #3a4760' }}>
+                          {methodId === m.id && <Icon name="check" size={10} strokeWidth={3} className="text-white" />}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-            <PaymentMethodsCard />
+            {methodId === 'qris' && <PaymentMethodsCard />}
           </div>
         </div>
 
@@ -94,7 +109,7 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
           </div>
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between"><dt className="text-muted-foreground">Nominal top up</dt><dd className="text-white tabular">{finalNominal > 0 ? formatRp(finalNominal) : '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Metode</dt><dd className="text-white">QRIS</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Metode</dt><dd className="text-white">{selectedMethod.label}</dd></div>
             <div className="flex justify-between"><dt className="text-muted-foreground">Biaya layanan</dt><dd className="text-white">Gratis</dd></div>
           </dl>
           <div className="divider my-4" />
@@ -105,8 +120,8 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
           {payErr && <div className="alert alert-danger mb-3"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{payErr}</span></div>}
           <button onClick={startPayment} disabled={finalNominal <= 0 || creating} className="btn btn-primary btn-lg btn-block">
             {creating
-              ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Membuat QRIS...</>
-              : <><Icon name="qr" size={18} /> Bayar via QRIS · {finalNominal > 0 ? formatRp(finalNominal) : '—'}</>}
+              ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Membuat pembayaran...</>
+              : <><Icon name="qr" size={18} /> Bayar via {selectedMethod.label} · {finalNominal > 0 ? formatRp(finalNominal) : '—'}</>}
           </button>
           <p className="hint mt-3 text-center">Saldo bertambah otomatis setelah top up dikonfirmasi.</p>
         </div>
@@ -141,7 +156,7 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
       </div>
 
       {payment && (
-        <QRISModal total={payment.amount} paymentId={payment.id} paymentUrl={payment.url} expiresAt={payment.expiresAt} onClose={() => setPayment(null)}
+        <QRISModal total={payment.amount} paymentId={payment.id} paymentUrl={payment.url} expiresAt={payment.expiresAt} method={payment.method} onClose={() => setPayment(null)}
           onDone={() => { onPaid(); loadHistory(); setPayment(null); setNominal(null); setCustom('') }} />
       )}
     </div>

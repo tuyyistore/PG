@@ -2,6 +2,9 @@ import logoQris from '../assets/payments/qris.svg'
 import { useEffect, useState } from 'react'
 import { Icon, formatRp } from '../ui'
 import { useToast, playSuccessSound } from '../feedback'
+import { PAYMENT_METHOD_OPTIONS, type PaymentMethodOption } from './PaymentMethods'
+
+const DEFAULT_METHOD: PaymentMethodOption = PAYMENT_METHOD_OPTIONS[0] // QRIS
 
 // ─── QRIS Modal (checkout QRIS di-embed langsung dari DOKU) ───────────────────
 
@@ -17,7 +20,9 @@ export function useCountdown(until?: number) {
   return { left, label: `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}` }
 }
 
-export function QRISModal({ total, paymentId, paymentUrl, expiresAt, onClose, onDone }: { total: number; paymentId: number; paymentUrl: string; expiresAt?: number; onClose: () => void; onDone: () => void }) {
+export function QRISModal({ total, paymentId, paymentUrl, expiresAt, method = DEFAULT_METHOD, onClose, onDone }: { total: number; paymentId: number; paymentUrl: string; expiresAt?: number; method?: PaymentMethodOption; onClose: () => void; onDone: () => void }) {
+  const isQris = method.id === 'qris'
+  const isVA = method.group === 'Virtual Account'
   const toast = useToast()
   const countdown = useCountdown(expiresAt)
   const copyAmount = async () => {
@@ -34,7 +39,7 @@ export function QRISModal({ total, paymentId, paymentUrl, expiresAt, onClose, on
         const r = await fetch(`/api/check-payment?paymentId=${paymentId}`)
         const d = await r.json()
         if (d.status === 'paid') { setDone(true); playSuccessSound() }
-        else if (d.status === 'expired') setWarn('QRIS ini sudah kedaluwarsa, tutup dan ulangi.')
+        else if (d.status === 'expired') setWarn(`Pembayaran ${method.label} ini sudah kedaluwarsa, tutup dan ulangi.`)
         else if (d.warning) setWarn(d.warning)
       } catch { /* diamkan, coba lagi di interval berikutnya */ }
     }, 6000)
@@ -64,7 +69,7 @@ export function QRISModal({ total, paymentId, paymentUrl, expiresAt, onClose, on
           <div className="flex items-center gap-3">
             <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="qr" size={18} /></div>
             <div>
-              <h3 className="text-sm font-semibold text-white">Bayar dengan QRIS</h3>
+              <h3 className="text-sm font-semibold text-white">Bayar dengan {method.label}</h3>
               <p className="text-xs text-muted-foreground">Pembayaran terverifikasi otomatis</p>
             </div>
           </div>
@@ -81,14 +86,14 @@ export function QRISModal({ total, paymentId, paymentUrl, expiresAt, onClose, on
             {countdown && (
               <p className={`text-xs mt-1 tabular flex items-center justify-center gap-1.5 ${countdown.left < 300 ? 'text-[#fbbf24]' : 'text-muted-foreground'}`}>
                 <Icon name="clock" size={13} />
-                {countdown.left > 0 ? <>Berlaku <span className="font-medium">{countdown.label}</span> lagi</> : 'QRIS sudah kedaluwarsa'}
+                {countdown.left > 0 ? <>Berlaku <span className="font-medium">{countdown.label}</span> lagi</> : `${method.label} sudah kedaluwarsa`}
               </p>
             )}
           </div>
 
           <div className="bg-white rounded-2xl p-3 flex flex-col items-center justify-center min-h-[300px]">
-            <iframe src={paymentUrl} title="Bayar QRIS via DOKU" className="w-full rounded-md border-0" style={{ minHeight: 280 }} />
-            <img src={logoQris} alt="QRIS" className="h-4 mt-3 object-contain" />
+            <iframe src={paymentUrl} title={`Bayar ${method.label} via DOKU`} className="w-full rounded-md border-0" style={{ minHeight: 280 }} />
+            {isQris && <img src={logoQris} alt="QRIS" className="h-4 mt-3 object-contain" />}
           </div>
 
           <div className="alert alert-warning">
@@ -96,7 +101,11 @@ export function QRISModal({ total, paymentId, paymentUrl, expiresAt, onClose, on
             <span>Bayar persis sesuai nominal ini ya.</span>
           </div>
 
-          <p className="hint text-center">Scan via GoPay · OVO · Dana · BCA · Mandiri</p>
+          <p className="hint text-center">
+            {isQris && 'Scan via GoPay · OVO · Dana · BCA · Mandiri'}
+            {isVA && `Salin nomor Virtual Account di atas, lalu bayar lewat ATM, m-banking, atau internet banking.`}
+            {method.group === 'E-Wallet' && `Kamu akan diarahkan untuk konfirmasi pembayaran di aplikasi ${method.label}.`}
+          </p>
 
           {warn && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{warn}</span></div>}
 

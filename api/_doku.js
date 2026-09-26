@@ -59,13 +59,16 @@ async function dokuRequest(method, path, bodyObj) {
 }
 
 /**
- * Buat transaksi pembayaran QRIS lewat DOKU Checkout, dapatkan payment.url
- * (halaman checkout ber-QR yang di-embed lewat jokul-checkout-js di frontend).
+ * Buat transaksi pembayaran lewat DOKU Checkout, dapatkan payment.url (halaman
+ * checkout DOKU yang di-embed lewat iframe di frontend). `dokuTypes` adalah
+ * array payment_method_types (lihat api/_paymentMethods.js) — kalau isinya
+ * cuma satu metode, customer langsung diarahkan ke metode itu tanpa harus
+ * memilih lagi di halaman DOKU.
  */
-export async function createQrisPayment({ invoiceNumber, amount, paymentDueMinutes = 60 }) {
+export async function createPayment({ invoiceNumber, amount, paymentDueMinutes = 60, dokuTypes = ['QRIS'] }) {
   const data = await dokuRequest('POST', '/checkout/v1/payment', {
     order: { amount: Math.round(amount), invoice_number: invoiceNumber, auto_redirect: false },
-    payment: { payment_method_types: ['QRIS'], payment_due_date: paymentDueMinutes },
+    payment: { payment_method_types: dokuTypes, payment_due_date: paymentDueMinutes },
   })
   const p = data?.response?.payment
   if (!p?.url) throw new Error('DOKU tidak mengembalikan payment.url')
@@ -73,6 +76,11 @@ export async function createQrisPayment({ invoiceNumber, amount, paymentDueMinut
   const m = String(p.expired_date).match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/)
   const expiresAt = m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 7, +m[5], +m[6]) : undefined
   return { url: p.url, tokenId: p.token_id, expiresAt }
+}
+
+/** @deprecated pakai createPayment({ dokuTypes: ['QRIS'] }) — dibiarkan supaya kode lama yang mengimpor ini tidak patah. */
+export async function createQrisPayment(args) {
+  return createPayment({ ...args, dokuTypes: ['QRIS'] })
 }
 
 /** Cek status transaksi berdasarkan invoice_number. Return status mentah dari DOKU. */

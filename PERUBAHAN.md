@@ -1,5 +1,26 @@
 # Ringkasan Perubahan
 
+## Metode pembayaran DOKU baru (tidak perlu migration)
+
+Halaman **Top Up Saldo** sekarang tidak lagi hanya QRIS — pengguna bisa pilih:
+- **QRIS** (default, seperti sebelumnya)
+- **E-wallet langsung**: OVO, DANA, ShopeePay
+- **Virtual Account**: BCA, Mandiri, BNI, BRI
+
+Semua metode diproses lewat DOKU Checkout API yang sama (`payment.payment_method_types`),
+tidak ada kolom/tabel baru di database — jadi **tidak perlu jalankan migration apa pun**
+untuk perubahan ini. Yang berubah:
+- `api/_paymentMethods.js` — **baru**, daftar metode → kode `payment_method_types` DOKU.
+  Tambah metode lain yang didukung DOKU (LinkAja, Alfamart/Indomaret, Akulaku, dst.) cukup
+  tambah entry di sini.
+- `api/_doku.js` — `createQrisPayment()` diganti `createPayment({ dokuTypes })` yang generik
+  (alias lama masih ada supaya tidak patah kalau ada kode lain yang mengimpornya).
+- `api/create-payment.js` — terima field baru `method` (opsional, default `'qris'`).
+- `src/components/PaymentMethods.tsx` — daftar `PAYMENT_METHOD_OPTIONS` + badge ikon untuk
+  metode yang belum ada logo SVG-nya (VA BCA/BNI/BRI, ShopeePay).
+- `src/pages/SaldoPage.tsx` & `src/components/QRISModal.tsx` — UI pilih metode pembayaran,
+  dan modal pembayaran menyesuaikan judul/instruksi sesuai metode yang dipilih.
+
 ## ⚠️ Wajib dijalankan dulu sebelum deploy
 
 0. `supabase/migration_v8.sql` — **baru**, mengganti payment gateway QRIS dari GoBiz
