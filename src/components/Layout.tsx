@@ -5,9 +5,9 @@ import { BrandMark, Avatar } from './Brand'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-export function Sidebar({ open, onClose, activePage, onNav, isAdmin }: {
-  open: boolean; onClose: () => void; activePage: string; onNav: (p: string) => void
-  user: SessionUser; profile: Row | null; isAdmin: boolean; onLogout: () => void
+export function Sidebar({ open, onClose, activePage, onNav, onLoginClick, user, isAdmin }: {
+  open: boolean; onClose: () => void; activePage: string; onNav: (p: string) => void; onLoginClick: () => void
+  user: SessionUser | null; profile: Row | null; isAdmin: boolean; onLogout: () => void
 }) {
   const items: { id: string; label: string; icon: IconName }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' as IconName },
@@ -50,9 +50,15 @@ export function Sidebar({ open, onClose, activePage, onNav, isAdmin }: {
 
           <p className="px-3 pb-2 pt-6 text-[11px] font-medium uppercase tracking-[0.08em] text-subtle">Akun</p>
           <div className="space-y-1">
-            <button onClick={() => { onNav('profile'); onClose() }} className={`nav-item ${activePage === 'profile' ? 'nav-item-active' : ''}`}>
-              <Icon name="settings" size={18} /><span>Pengaturan</span>
-            </button>
+            {user ? (
+              <button onClick={() => { onNav('profile'); onClose() }} className={`nav-item ${activePage === 'profile' ? 'nav-item-active' : ''}`}>
+                <Icon name="settings" size={18} /><span>Pengaturan</span>
+              </button>
+            ) : (
+              <button onClick={() => { onLoginClick(); onClose() }} className="nav-item" style={{ color: '#4f7cff' }}>
+                <Icon name="user" size={18} /><span>Masuk</span>
+              </button>
+            )}
           </div>
         </nav>
 
@@ -81,18 +87,19 @@ export const PAGE_TITLES: Record<string, string> = {
   checkout: 'Checkout', profile: 'Pengaturan', admin: 'Dashboard Admin',
 }
 
-export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileAction, onSettingsClick, user, profile, page }: {
+export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileAction, onSettingsClick, onLoginClick, user, profile, page }: {
   onMenuOpen: () => void
   onProfileClick: (e: React.MouseEvent) => void
   showDropdown: boolean
   onProfileAction: (a: string) => void
   onSettingsClick: () => void
-  user: SessionUser
+  onLoginClick: () => void
+  user: SessionUser | null
   profile: Row | null
   page: string
 }) {
-  const shownUser: SessionUser = profile?.avatar_url ? { ...user, user_metadata: { ...user.user_metadata, avatar_url: profile.avatar_url } } : user
-  const shownName = profile?.full_name || displayName(user)
+  const shownUser: SessionUser | null = user && profile?.avatar_url ? { ...user, user_metadata: { ...user.user_metadata, avatar_url: profile.avatar_url } } : user
+  const shownName = user ? (profile?.full_name || displayName(user)) : ''
   const menu: { action: string; label: string; icon: IconName }[] = [
     { action: 'My Profile', label: 'Profil Saya', icon: 'user' },
     { action: 'Logout', label: 'Logout', icon: 'logout' },
@@ -120,33 +127,39 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
           <Icon name="settings" size={18} />
         </button>
 
-        <div className="relative">
-          <button onClick={onProfileClick} className="flex items-center gap-2 h-10 pl-1 pr-1 sm:pr-2.5 rounded-[14px] transition-colors duration-200 hover:bg-white/[0.04]" aria-haspopup="menu" aria-expanded={showDropdown}>
-            <span className="relative">
-              <Avatar user={shownUser} size={30} />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e', border: '2px solid #0b1220' }} />
-            </span>
-            <span className="hidden sm:block text-sm font-medium text-white max-w-[140px] truncate">{shownName}</span>
-            <Icon name="chevronDown" size={14} className="hidden sm:block text-muted-foreground" />
-          </button>
+        {user ? (
+          <div className="relative">
+            <button onClick={onProfileClick} className="flex items-center gap-2 h-10 pl-1 pr-1 sm:pr-2.5 rounded-[14px] transition-colors duration-200 hover:bg-white/[0.04]" aria-haspopup="menu" aria-expanded={showDropdown}>
+              <span className="relative">
+                <Avatar user={shownUser!} size={30} />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e', border: '2px solid #0b1220' }} />
+              </span>
+              <span className="hidden sm:block text-sm font-medium text-white max-w-[140px] truncate">{shownName}</span>
+              <Icon name="chevronDown" size={14} className="hidden sm:block text-muted-foreground" />
+            </button>
 
-          {showDropdown && (
-            <div className="absolute right-0 top-12 w-56 rounded-2xl p-1.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]" role="menu"
-              style={{ background: '#1a2235', border: '1px solid rgba(255,255,255,0.08)', animation: 'dialog-in 200ms' }}
-              onClick={e => e.stopPropagation()}>
-              <div className="px-3 py-2.5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <p className="text-sm font-medium text-white truncate">{shownName}</p>
-                <p className="text-xs text-muted-foreground truncate">{displayHandle(user)}</p>
+            {showDropdown && (
+              <div className="absolute right-0 top-12 w-56 rounded-2xl p-1.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6)]" role="menu"
+                style={{ background: '#1a2235', border: '1px solid rgba(255,255,255,0.08)', animation: 'dialog-in 200ms' }}
+                onClick={e => e.stopPropagation()}>
+                <div className="px-3 py-2.5 mb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-sm font-medium text-white truncate">{shownName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{displayHandle(user)}</p>
+                </div>
+                {menu.map(m => (
+                  <button key={m.action} onClick={() => onProfileAction(m.action)} role="menuitem"
+                    className={`w-full flex items-center gap-2.5 px-3 h-9 rounded-[10px] text-sm text-left transition-colors duration-200 ${m.action === 'Logout' ? 'text-[#f87171] hover:bg-[#ef4444]/10' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white'}`}>
+                    <Icon name={m.icon} size={16} /> {m.label}
+                  </button>
+                ))}
               </div>
-              {menu.map(m => (
-                <button key={m.action} onClick={() => onProfileAction(m.action)} role="menuitem"
-                  className={`w-full flex items-center gap-2.5 px-3 h-9 rounded-[10px] text-sm text-left transition-colors duration-200 ${m.action === 'Logout' ? 'text-[#f87171] hover:bg-[#ef4444]/10' : 'text-slate-200 hover:bg-white/[0.05] hover:text-white'}`}>
-                  <Icon name={m.icon} size={16} /> {m.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        ) : (
+          <button onClick={onLoginClick} className="btn btn-primary btn-sm">
+            <Icon name="user" size={16} /> Masuk
+          </button>
+        )}
       </div>
     </header>
   )
