@@ -4,6 +4,9 @@ import { BrowserRouter } from 'react-router'
 import App from './App'
 import './index.css'
 import { ConfirmProvider, ToastProvider } from './feedback'
+import { installProtection } from './lib/protect'
+
+installProtection()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
