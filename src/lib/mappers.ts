@@ -11,7 +11,7 @@ export const rowToProduct = (r: Row): Product => ({
 })
 
 export const rowToOrder = (r: Row): Order => ({
-  id: 'ORD-' + r.id,
+  id: r.order_code ?? 'ORD-' + r.id, // kode acak unik (migration_v10); fallback ke ID lama
   product: rowToProduct({ ...r, id: r.id, name: r.product_name, tagline: '', features: [], popular: false, logo_url: r.logo_url }),
   status: r.status,
   createdAt: r.created_at,
