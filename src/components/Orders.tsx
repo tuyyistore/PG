@@ -6,7 +6,7 @@ import { useToast } from '../feedback'
 
 // ─── Tombol copy kecil untuk kode order ───────────────────────────────────────
 
-export function CopyCodeButton({ code }: { code: string }) {
+export function CopyCodeButton({ code, label = 'Kode order' }: { code: string; label?: string }) {
   const toast = useToast()
   const copy = async (e: MouseEvent) => {
     e.stopPropagation()
@@ -17,12 +17,12 @@ export function CopyCodeButton({ code }: { code: string }) {
         const ta = document.createElement('textarea')
         ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0'
         document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
-      } catch { toast('Gagal menyalin kode order', 'error'); return }
+      } catch { toast(`Gagal menyalin ${label.toLowerCase()}`, 'error'); return }
     }
-    toast('Kode order disalin: ' + code)
+    toast(label === 'Kode order' ? `Kode order disalin: ${code}` : `${label} disalin`)
   }
   return (
-    <button type="button" onClick={copy} aria-label={`Salin kode order ${code}`} title="Salin kode order"
+    <button type="button" onClick={copy} aria-label={`Salin ${label.toLowerCase()}`} title={`Salin ${label.toLowerCase()}`}
       className="inline-flex items-center justify-center w-5 h-5 rounded-md flex-shrink-0 text-slate-400 hover:text-white hover:bg-white/10 active:scale-90 transition-all duration-200">
       <Icon name="copy" size={12} />
     </button>
@@ -46,7 +46,10 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
           <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm flex-shrink-0" aria-label="Tutup"><Icon name="x" size={18} /></button>
         </div>
         <div className="p-5">
-          <p className="label">Data akun / informasi penting</p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="label !mb-0">Data akun / informasi penting</p>
+            {order.accountData && <CopyCodeButton code={order.accountData} label="Data akun" />}
+          </div>
           <div className="card-inset p-4">
             {order.accountData ? (
               <p className="text-[13px] text-slate-100 whitespace-pre-wrap leading-relaxed font-mono break-words">{order.accountData}</p>
