@@ -4,9 +4,7 @@ import { type Product, type CartItem } from '../types'
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
-export function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => void; inCart: boolean }) {
-  const [expanded, setExpanded] = useState(false)
-
+export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Product; onAdd: () => void; inCart: boolean; expanded: boolean; onToggle: () => void }) {
   return (
     <div
       className="card card-interactive overflow-hidden relative"
@@ -20,7 +18,7 @@ export function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => voi
           TERLARIS
         </div>
       )}
-      <button type="button" className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left" onClick={() => setExpanded(e => !e)} aria-expanded={expanded}>
+      <button type="button" className="w-full flex items-center gap-4 px-4 sm:px-5 py-4 text-left" onClick={onToggle} aria-expanded={expanded}>
         <ProductThumb url={p.logoUrl} size={48} iconSize={20} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -72,6 +70,7 @@ export function ProductCard({ p, onAdd, inCart }: { p: Product; onAdd: () => voi
 
 export function ProdukPage({ cart, onAdd, products, categories, loading }: { cart: CartItem[]; onAdd: (p: Product) => void; products: Product[]; categories: string[]; loading?: boolean }) {
   const [tab, setTab] = useState('Semua')
+  const [openId, setOpenId] = useState<Product['id'] | null>(null)
   // Tab kategori diambil langsung dari kategori yang dibuat admin di database,
   // jadi kategori baru otomatis muncul di sini tanpa perlu ubah kode.
   const tabs = ['Semua', ...categories]
@@ -92,8 +91,8 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
     const dy = e.changedTouches[0].clientY - start.y
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return // abaikan geser vertikal/kecil
     const idx = tabs.indexOf(tab)
-    if (dx < 0 && idx < tabs.length - 1) setTab(tabs[idx + 1]) // geser ke kiri → kategori berikutnya
-    else if (dx > 0 && idx > 0) setTab(tabs[idx - 1]) // geser ke kanan → kategori sebelumnya
+    if (dx < 0 && idx < tabs.length - 1) { setTab(tabs[idx + 1]); setOpenId(null) } // geser ke kiri → kategori berikutnya
+    else if (dx > 0 && idx > 0) { setTab(tabs[idx - 1]); setOpenId(null) } // geser ke kanan → kategori sebelumnya
   }
 
   return (
@@ -102,7 +101,7 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
       <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
         <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
           {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)} className={`chip ${tab === t ? 'chip-active' : ''}`}>
+            <button key={t} onClick={() => { setTab(t); setOpenId(null) }} className={`chip ${tab === t ? 'chip-active' : ''}`}>
               {t} <span className="opacity-60">({countFor(t)})</span>
             </button>
           ))}
@@ -117,7 +116,7 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
             {filtered.map(p => (
-              <ProductCard key={p.id} p={p} onAdd={() => onAdd(p)} inCart={cartIds.has(p.id)} />
+              <ProductCard key={p.id} p={p} onAdd={() => onAdd(p)} inCart={cartIds.has(p.id)} expanded={openId === p.id} onToggle={() => setOpenId(id => id === p.id ? null : p.id)} />
             ))}
           </div>
         )}
