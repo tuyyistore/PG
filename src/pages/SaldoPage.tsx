@@ -1,130 +1,24 @@
 import { useEffect, useState } from 'react'
-import { api, apiFn, type Row } from '../lib/supabase'
+import { api, type Row } from '../lib/supabase'
 import { Icon, formatRp, PageHeader, EmptyState, StatusBadge, SkeletonRows } from '../ui'
-import { QRISModal } from '../components/QRISModal'
-import { PaymentMethodsCard, PaymentMethodBadge, PAYMENT_METHOD_OPTIONS, type PaymentMethodOption } from '../components/PaymentMethods'
 
 // ─── Saldo Page ───────────────────────────────────────────────────────────────
 
-export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: () => void; userId: string }) {
+export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) {
   const [history, setHistory] = useState<Row[] | null>(null)
   const loadHistory = () => api(`topups?select=id,amount,status,created_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
   useEffect(() => { loadHistory() }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [nominal, setNominal] = useState<number | null>(null)
-  const [custom, setCustom] = useState('')
-  const [methodId, setMethodId] = useState<string>('qris')
-  const selectedMethod = PAYMENT_METHOD_OPTIONS.find(m => m.id === methodId) ?? PAYMENT_METHOD_OPTIONS[0]
-  const [payment, setPayment] = useState<{ id: number; amount: number; url: string; expiresAt?: number; method: PaymentMethodOption } | null>(null)
-  const presets = [10000, 25000, 50000, 100000, 250000, 500000]
-  const finalNominal = nominal ?? Number(custom.replace(/\D/g, ''))
-
-  const [creating, setCreating] = useState(false)
-  const [payErr, setPayErr] = useState('')
-
-  // Payment dibuat & divalidasi di server lewat /api/create-payment, yang juga
-  // memanggil DOKU untuk mendapatkan halaman pembayarannya sesuai metode yang
-  // dipilih (QRIS, VA bank, atau e-wallet langsung) — lihat api/create-payment.js.
-  async function startPayment() {
-    if (finalNominal <= 0 || creating) return
-    setCreating(true); setPayErr('')
-    try {
-      const row = await apiFn<{ id: number; amount: number; url: string; expiresAt?: number; method: string }>('create-payment', { method: 'POST', body: { kind: 'topup', amount: finalNominal, method: methodId } })
-      setPayment({ ...row, method: PAYMENT_METHOD_OPTIONS.find(m => m.id === row.method) ?? selectedMethod })
-    } catch (e) { setPayErr((e as Error).message || 'Gagal membuat pembayaran. Coba lagi.') } finally { setCreating(false) }
-  }
-
   return (
     <div className="space-y-6">
-      <PageHeader title="Top Up Saldo" subtitle="Isi saldo instan lewat QRIS, e-wallet, atau Virtual Account — terverifikasi otomatis." />
+      <PageHeader title="Saldo" subtitle="Saldo dan riwayat top up akunmu." />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 lg:gap-6 items-start">
-        {/* Left column */}
-        <div className="space-y-4">
-          <div className="card p-5 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="section-title">Pilih nominal</h2>
-              <span className="text-xs text-muted-foreground">Langkah 1 dari 2</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-              {presets.map(n => (
-                <button key={n} onClick={() => { setNominal(n); setCustom('') }}
-                  className={`option h-14 px-4 flex items-center justify-between text-left ${nominal === n ? 'option-active' : ''}`}>
-                  <span className="text-[15px] font-semibold tabular">{formatRp(n)}</span>
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors duration-200 ${nominal === n ? 'bg-[#4f7cff]' : ''}`} style={nominal === n ? undefined : { border: '1.5px solid #3a4760' }}>
-                    {nominal === n && <Icon name="check" size={10} strokeWidth={3} className="text-white" />}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-5">
-              <label className="label" htmlFor="custom-nominal">Nominal lainnya</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">Rp</span>
-                <input id="custom-nominal" value={custom} onChange={e => { setCustom(e.target.value); setNominal(null) }}
-                  placeholder="0" inputMode="numeric"
-                  className="input tabular" style={{ paddingLeft: 44 }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="card p-5 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="section-title">Metode pembayaran</h2>
-              <span className="text-xs text-muted-foreground">Langkah 2 dari 2</span>
-            </div>
-            <div className="space-y-4">
-              {(['Otomatis', 'E-Wallet', 'Virtual Account'] as const).map(group => (
-                <div key={group}>
-                  <p className="eyebrow mb-2">{group === 'Otomatis' ? 'Direkomendasikan' : group}</p>
-                  <div className="space-y-2">
-                    {PAYMENT_METHOD_OPTIONS.filter(m => m.group === group).map(m => (
-                      <button key={m.id} onClick={() => setMethodId(m.id)}
-                        className={`option w-full px-4 py-3.5 flex items-center gap-4 text-left ${methodId === m.id ? 'option-active' : ''}`}>
-                        <PaymentMethodBadge option={m} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white">{m.label}</p>
-                          <p className="text-xs text-muted-foreground truncate">{m.hint}</p>
-                        </div>
-                        {m.group === 'Otomatis' && methodId !== m.id && <span className="badge badge-primary">Otomatis</span>}
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors duration-200 ${methodId === m.id ? 'bg-[#4f7cff]' : ''}`} style={methodId === m.id ? undefined : { border: '1.5px solid #3a4760' }}>
-                          {methodId === m.id && <Icon name="check" size={10} strokeWidth={3} className="text-white" />}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {methodId === 'qris' && <PaymentMethodsCard />}
-          </div>
+      <div className="card p-5 sm:p-6 space-y-4">
+        <div className="card-inset p-4">
+          <p className="text-xs text-muted-foreground">Saldo kamu</p>
+          <p className="text-2xl font-semibold text-white tracking-tight tabular mt-0.5">{formatRp(saldo)}</p>
         </div>
-
-        {/* Right column — summary */}
-        <div className="card p-5 sm:p-6 lg:sticky lg:top-24">
-          <h2 className="section-title mb-4">Ringkasan</h2>
-          <div className="card-inset p-4 mb-4">
-            <p className="text-xs text-muted-foreground">Saldo kamu</p>
-            <p className="text-2xl font-semibold text-white tracking-tight tabular mt-0.5">{formatRp(saldo)}</p>
-          </div>
-          <dl className="space-y-3 text-sm">
-            <div className="flex justify-between"><dt className="text-muted-foreground">Nominal top up</dt><dd className="text-white tabular">{finalNominal > 0 ? formatRp(finalNominal) : '—'}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Metode</dt><dd className="text-white">{selectedMethod.label}</dd></div>
-            <div className="flex justify-between"><dt className="text-muted-foreground">Biaya layanan</dt><dd className="text-white">Gratis</dd></div>
-          </dl>
-          <div className="divider my-4" />
-          <div className="flex justify-between items-baseline mb-5">
-            <span className="text-sm text-muted-foreground">Total</span>
-            <span className="text-xl font-semibold text-white tabular">{finalNominal > 0 ? formatRp(finalNominal) : '—'}</span>
-          </div>
-          {payErr && <div className="alert alert-danger mb-3"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{payErr}</span></div>}
-          <button onClick={startPayment} disabled={finalNominal <= 0 || creating} className="btn btn-primary btn-lg btn-block">
-            {creating
-              ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Membuat pembayaran...</>
-              : <><Icon name="qr" size={18} /> Bayar via {selectedMethod.label} · {finalNominal > 0 ? formatRp(finalNominal) : '—'}</>}
-          </button>
-          <p className="hint mt-3 text-center">Saldo bertambah otomatis setelah top up dikonfirmasi.</p>
-        </div>
+        <div className="alert alert-warning"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>Top up otomatis sedang tidak tersedia. Hubungi admin untuk menambah saldo.</span></div>
       </div>
 
       <div className="card overflow-hidden">
@@ -154,11 +48,6 @@ export function SaldoPage({ saldo, onPaid, userId }: { saldo: number; onPaid: ()
           </div>
         )}
       </div>
-
-      {payment && (
-        <QRISModal total={payment.amount} paymentId={payment.id} paymentUrl={payment.url} expiresAt={payment.expiresAt} method={payment.method} onClose={() => setPayment(null)}
-          onDone={() => { onPaid(); loadHistory(); setPayment(null); setNominal(null); setCustom('') }} />
-      )}
     </div>
   )
 }

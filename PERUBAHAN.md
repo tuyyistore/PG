@@ -1,5 +1,21 @@
 # Ringkasan Perubahan
 
+## Penghapusan DOKU & Preflix (terbaru)
+
+- **DOKU dihapus:** `api/_doku.js`, `api/_paymentMethods.js`, `api/create-payment.js`,
+  `api/check-payment.js`, komponen `QRISModal` & `PaymentMethods`, dan semua logo metode
+  pembayaran. Halaman **Saldo** kini hanya menampilkan saldo + riwayat top up, dengan info
+  bahwa top up otomatis tidak tersedia (admin masih bisa **Tambah Saldo** dari Admin → Pengguna).
+- **Preflix dihapus:** `api/_preflix.js`, `api/admin-sync-preflix.js`, `api/fulfill-order.js`,
+  tombol "Sync dari Preflix", badge Preflix, peringatan auto-fulfillment, dan pemanggilan
+  `fulfill-order` saat checkout. Data akun pesanan kini murni diisi manual oleh admin.
+- **Database:** jalankan `supabase/migration_v9.sql` (setelah v8). Ini menghapus semua produk
+  ber-`supplier='preflix'`, membuang kolom/tabel/fungsi Preflix & DOKU, dan memperbarui
+  `buy_with_saldo`. **Jalankan bersamaan dengan deploy kode terbaru.**
+- **Env Vercel yang bisa dihapus:** `DOKU_CLIENT_ID`, `DOKU_SECRET_KEY`, `DOKU_IS_PRODUCTION`,
+  `PREFLIX_ID_USER`, `PREFLIX_KEY_USER`.
+- Catatan: bagian lama di bawah ini menyebut DOKU/Preflix sebagai riwayat perubahan saja.
+
 ## Metode pembayaran DOKU baru (tidak perlu migration)
 
 Halaman **Top Up Saldo** sekarang tidak lagi hanya QRIS — pengguna bisa pilih:

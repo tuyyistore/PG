@@ -144,17 +144,12 @@ export default function App() {
     toast(`${p.name} ditambahkan ke keranjang`)
   }
 
-  // Order/topup sudah ditulis backend (api/check-payment.js) begitu pembayaran DOKU terdeteksi sukses —
-  // di sini tinggal muat ulang data terbaru dari Supabase.
+  // Muat ulang data terbaru dari Supabase setelah checkout selesai.
   async function handleCheckoutDone() {
     navigate('dashboard')
     setCart([])
     playSuccessSound()
     toast('Pembelian berhasil. Pesanan sudah aktif di Produk Saya.')
-    try { await loadMine(session!.user.id) } catch (e) { fail(e) }
-  }
-
-  async function handlePaid() {
     try { await loadMine(session!.user.id) } catch (e) { fail(e) }
   }
 
@@ -212,7 +207,7 @@ export default function App() {
         {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} loading={!catalogLoaded} />}
         {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} loading={!mineLoaded}
           onRefresh={session ? () => loadMine(session.user.id) : undefined} />}
-        {page === 'saldo'     && <SaldoPage saldo={saldo} onPaid={handlePaid} userId={session!.user.id} />}
+        {page === 'saldo'     && <SaldoPage saldo={saldo} userId={session!.user.id} />}
         {page === 'checkout'  && <CheckoutPage cart={cart} saldo={saldo} profile={profile} onBack={() => navigate('produk')}
           onBoughtWithSaldo={handleCheckoutDone} onGoTopUp={() => navigate('saldo')} />}
         {page === 'profile'   && <ProfilePage user={session!.user} isAdmin={isAdmin} profile={profile} onSaved={patch => setProfile(pr => ({ ...(pr ?? {}), ...patch }))} />}
