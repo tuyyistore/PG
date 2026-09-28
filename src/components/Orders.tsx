@@ -1,5 +1,6 @@
 import { Icon, formatRp, ProductThumb, StatusBadge, type IconName } from '../ui'
 import { type Order } from '../types'
+import { openLiveChat } from './Layout'
 
 // ─── Detail Pesanan Modal (data akun/info penting yang dikirim admin) ─────────
 
@@ -26,6 +27,10 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
               <p className="hint">Belum ada data yang dikirim admin untuk pesanan ini. Silakan hubungi support jika perlu.</p>
             )}
           </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Butuh bantuan aktivasi akun/data?{' '}
+            <button type="button" onClick={openLiveChat} className="text-[#4f7cff] hover:text-[#5e89ff] hover:underline transition-colors">Hubungi admin</button>
+          </p>
         </div>
       </div>
     </div>
