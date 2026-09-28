@@ -1,6 +1,33 @@
+import { type MouseEvent } from 'react'
 import { Icon, formatRp, ProductThumb, StatusBadge, type IconName } from '../ui'
 import { type Order } from '../types'
 import { openLiveChat } from './Layout'
+import { useToast } from '../feedback'
+
+// ─── Tombol copy kecil untuk kode order ───────────────────────────────────────
+
+export function CopyCodeButton({ code }: { code: string }) {
+  const toast = useToast()
+  const copy = async (e: MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(code)
+    } catch {
+      try {
+        const ta = document.createElement('textarea')
+        ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0'
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta)
+      } catch { toast('Gagal menyalin kode order', 'error'); return }
+    }
+    toast('Kode order disalin: ' + code)
+  }
+  return (
+    <button type="button" onClick={copy} aria-label={`Salin kode order ${code}`} title="Salin kode order"
+      className="inline-flex items-center justify-center w-5 h-5 rounded-md flex-shrink-0 text-slate-400 hover:text-white hover:bg-white/10 active:scale-90 transition-all duration-200">
+      <Icon name="copy" size={12} />
+    </button>
+  )
+}
 
 // ─── Detail Pesanan Modal (data akun/info penting yang dikirim admin) ─────────
 
@@ -13,7 +40,7 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
             <ProductThumb url={order.product.logoUrl} size={40} iconSize={18} />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white truncate">{order.product.name}</p>
-              <p className="text-xs text-muted-foreground tabular">{order.id} · {order.date}</p>
+              <p className="text-xs text-muted-foreground tabular flex items-center gap-1.5"><CopyCodeButton code={order.id} /><span className="truncate font-mono">{order.id}</span><span>· {order.date}</span></p>
             </div>
           </div>
           <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm flex-shrink-0" aria-label="Tutup"><Icon name="x" size={18} /></button>
@@ -63,7 +90,10 @@ export function OrderRow({ o, onDetail, showMeta }: { o: Order; onDetail: (o: Or
       <ProductThumb url={o.product.logoUrl} size={40} iconSize={18} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-white truncate">{o.product.name}</p>
-        <p className="text-xs text-muted-foreground tabular truncate mt-0.5">{o.id} · {o.date}{showMeta && o.product.category && <span className="hidden sm:inline"> · {o.product.category}</span>}</p>
+        <p className="text-xs text-muted-foreground tabular mt-0.5 flex items-center gap-1.5 min-w-0">
+          <CopyCodeButton code={o.id} />
+          <span className="truncate"><span className="font-mono">{o.id}</span> · {o.date}{showMeta && o.product.category && <span className="hidden sm:inline"> · {o.product.category}</span>}</span>
+        </p>
       </div>
       {showMeta && (
         <p className="hidden sm:block text-sm font-medium text-white tabular whitespace-nowrap">
