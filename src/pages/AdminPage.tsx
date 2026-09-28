@@ -144,7 +144,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       run(() => api(`categories?id=eq.${c.id}`, { method: 'DELETE' }), 'Kategori dihapus')
   }
 
-  const saveAccountData = (o: Row) => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: { account_data: orderNotes[o.id] ?? o.account_data ?? '' } }), 'Data akun disimpan')
+  const saveAccountData = (o: Row) => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: (() => { const data = orderNotes[o.id] ?? o.account_data ?? ''; return o.status === 'pending' && data.trim() ? { account_data: data, status: 'aktif' } : { account_data: data } })() }), 'Data akun disimpan')
 
   const adjustSaldo = (delta: number) => {
     if (!detailUser || !delta) return
