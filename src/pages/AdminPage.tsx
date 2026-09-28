@@ -92,16 +92,17 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
     }
   }, [d.categories]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const copyOrderId = async (id: number) => {
+  const orderCode = (o: Row) => String(o.order_code ?? `ORD-${o.id}`)
+  const copyOrderId = async (code: string) => {
     try {
-      await navigator.clipboard.writeText(`ORD-${id}`)
-      toast('ID pesanan disalin: ORD-' + id)
+      await navigator.clipboard.writeText(code)
+      toast('Kode order disalin: ' + code)
     } catch { toast('Gagal menyalin ID pesanan', 'error') }
   }
 
   const oq = orderSearch.trim().toLowerCase()
   const filteredOrders = !oq ? d.orders : d.orders.filter(o =>
-    `ord-${o.id}`.includes(oq) || String(o.id).includes(oq) ||
+    orderCode(o).toLowerCase().includes(oq) || `ord-${o.id}`.includes(oq) ||
     (o.product_name ?? '').toLowerCase().includes(oq) || who(o.user_id).toLowerCase().includes(oq)
   )
 
@@ -188,10 +189,10 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       {loaded && tab === 'pesanan' && (
         <div className="space-y-4">
           <div className="card p-4 sm:p-5 space-y-2">
-            <Field label="Cari ID pesanan (mis. ORD-12 atau 12), nama produk, atau email pembeli">
+            <Field label="Cari kode order (mis. ORD-K7M2QX9P), nama produk, atau email pembeli">
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={MUTED}><Icon name="search" size={16} /></span>
-                <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. ORD-12" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
+                <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. ORD-K7M2QX9P" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
               </div>
             </Field>
             {oq && <p className="hint">{filteredOrders.length > 0 ? `Ditemukan ${filteredOrders.length} pesanan cocok.` : 'Tidak ada pesanan yang cocok.'}</p>}
@@ -216,8 +217,8 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5">
-                    <span className="text-[13px] font-medium text-white flex-1 truncate font-mono">ORD-{o.id}</span>
-                    <button onClick={() => copyOrderId(o.id)} className="btn btn-ghost btn-sm" aria-label="Salin ID pesanan">
+                    <span className="text-[13px] font-medium text-white flex-1 truncate font-mono">{orderCode(o)}</span>
+                    <button onClick={() => copyOrderId(orderCode(o))} className="btn btn-ghost btn-sm" aria-label="Salin ID pesanan">
                       <Icon name="copy" size={14} /> Salin ID
                     </button>
                   </div>
