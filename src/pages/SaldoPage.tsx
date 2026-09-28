@@ -11,7 +11,15 @@ const WA_URL = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Halo admin
 
 export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) {
   const [history, setHistory] = useState<Row[] | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
   const loadHistory = () => api(`topups?select=id,amount,status,created_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
+  // Dipakai tombol muat ulang: ikon berputar selama memuat (minimal 700 ms supaya animasinya terlihat).
+  const refreshHistory = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    await Promise.all([loadHistory(), new Promise(r => setTimeout(r, 700))])
+    setRefreshing(false)
+  }
   useEffect(() => { loadHistory() }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -40,7 +48,9 @@ export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) 
             <h2 className="section-title">Riwayat top up</h2>
             <p className="text-xs text-muted-foreground mt-0.5">10 transaksi terakhir</p>
           </div>
-          <button onClick={loadHistory} className="btn btn-ghost btn-icon btn-sm -mr-2" aria-label="Muat ulang riwayat"><Icon name="refresh" size={16} /></button>
+          <button onClick={refreshHistory} disabled={refreshing} aria-busy={refreshing} className="btn btn-ghost btn-icon btn-sm -mr-2" aria-label="Muat ulang riwayat">
+            <span className={`inline-flex ${refreshing ? 'animate-spin' : ''}`}><Icon name="refresh" size={16} /></span>
+          </button>
         </div>
         {history === null ? <SkeletonRows rows={2} thumb={36} /> : history.length === 0 ? (
           <EmptyState icon="wallet" title="Belum ada top up" description="Top up yang berhasil akan tercatat di sini." />
