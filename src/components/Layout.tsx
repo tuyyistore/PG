@@ -170,11 +170,13 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
 
 // ─── Support Button (buka live chat Chaport) ──────────────────────────────────
 
+export function openLiveChat() {
+  const w = window as unknown as { chaport?: { q: (...args: unknown[]) => void } }
+  w.chaport?.q('open')
+}
+
 export function SupportButton({ raised }: { raised?: boolean }) {
-  const openChat = () => {
-    const w = window as unknown as { chaport?: { q: (...args: unknown[]) => void } }
-    w.chaport?.q('open')
-  }
+  const openChat = openLiveChat
   return (
     <button
       onClick={openChat}
