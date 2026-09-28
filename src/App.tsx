@@ -149,7 +149,7 @@ export default function App() {
     navigate('dashboard')
     setCart([])
     playSuccessSound()
-    toast('Pembelian berhasil. Pesanan sudah aktif di Produk Saya.')
+    toast('Pembelian berhasil. Pesanan menunggu diproses admin.')
     try { await loadMine(session!.user.id) } catch (e) { fail(e) }
   }
 
