@@ -1,5 +1,5 @@
 import { type MouseEvent } from 'react'
-import { Icon, formatRp, ProductThumb, StatusBadge, type IconName } from '../ui'
+import { Icon, formatRp, ProductThumb, StatusBadge } from '../ui'
 import { type Order } from '../types'
 import { openLiveChat } from './Layout'
 import { useToast } from '../feedback'
@@ -70,11 +70,14 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
 
 // ─── Stat Card — compact horizontal, monochrome icon ──────────────────────────
 
-export function StatCard({ icon, label, value, tone, loading }: { icon: IconName; label: string; value: string; tone: 'success' | 'warning' | 'danger'; loading?: boolean }) {
+export function StatCard({ icon, label, value, tone, loading }: { icon: string; label: string; value: string; tone: 'success' | 'warning' | 'danger'; loading?: boolean }) {
   const dot = { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444' }[tone]
   return (
     <div className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
-      <div className="icon-tile"><Icon name={icon} size={18} /></div>
+      <div className="icon-tile">
+        {/* SVG berwarna: semua ukuran viewBox sudah dirapatkan ke lingkaran, jadi tampil identik */}
+        <img src={icon} alt="" width={24} height={24} draggable={false} className="block w-6 h-6 select-none" />
+      </div>
       <div className="min-w-0 flex-1">
         <p className="text-[13px] text-muted-foreground flex items-center gap-2 truncate">
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dot }} />{label}
