@@ -193,7 +193,7 @@ export function SupportButton({ raised }: { raised?: boolean }) {
 
 // ─── Cart Bar ─────────────────────────────────────────────────────────────────
 
-export function CartBar({ cart, onCheckout }: { cart: CartItem[]; onCheckout: () => void }) {
+export function CartBar({ cart, onCheckout, onCancel }: { cart: CartItem[]; onCheckout: () => void; onCancel: () => void }) {
   if (cart.length === 0) return null
   const total = cart.reduce((s, i) => s + i.product.price, 0)
   return (
@@ -204,7 +204,10 @@ export function CartBar({ cart, onCheckout }: { cart: CartItem[]; onCheckout: ()
           <p className="text-sm font-medium text-white">{cart.length} item dipilih</p>
           <p className="text-xs text-muted-foreground tabular">{formatRp(total)}</p>
         </div>
-        <button onClick={onCheckout} className="btn btn-primary">
+        <button onClick={onCancel} className="btn btn-secondary flex-shrink-0" aria-label="Batalkan keranjang">
+          Batal
+        </button>
+        <button onClick={onCheckout} className="btn btn-primary flex-shrink-0">
           Checkout <span className="hidden sm:inline tabular">· {formatRp(total)}</span> <Icon name="chevronRight" size={16} />
         </button>
       </div>
