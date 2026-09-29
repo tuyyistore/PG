@@ -3,6 +3,9 @@ import { Icon, formatRp, PageHeader, EmptyState, SkeletonRows, PullToRefresh } f
 import { type Order } from '../types'
 import { StatCard, OrderRow } from '../components/Orders'
 import { SpendingChart } from '../components/SpendingChart'
+import iconSuccess from '../assets/icons/status-success.svg'
+import iconPending from '../assets/icons/status-pending.svg'
+import iconCancel from '../assets/icons/status-cancel.svg'
 
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 
@@ -50,9 +53,9 @@ export function DashboardPage({ orders, saldo, onNav, onDetail, loading, onRefre
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <StatCard icon="circleCheck" tone="success" label="Total Produk Dibeli" loading={loading} value={String(dibeli)} />
-        <StatCard icon="clock" tone="warning" label="Total Produk Pending" loading={loading} value={String(pendingOrders)} />
-        <StatCard icon="circleX" tone="danger" label="Total Produk Dibatalkan" loading={loading} value={String(dibatalkan)} />
+        <StatCard icon={iconSuccess} tone="success" label="Total Produk Dibeli" loading={loading} value={String(dibeli)} />
+        <StatCard icon={iconPending} tone="warning" label="Total Produk Pending" loading={loading} value={String(pendingOrders)} />
+        <StatCard icon={iconCancel} tone="danger" label="Total Produk Dibatalkan" loading={loading} value={String(dibatalkan)} />
       </div>
 
       <SpendingChart orders={orders} loading={loading} />
