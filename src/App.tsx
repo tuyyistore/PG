@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ADMIN_EMAIL, api, initSession, signOut, type Row, type Session } from './lib/supabase'
 import { Icon } from './ui'
-import { useToast, playSuccessSound } from './feedback'
+import { useToast, useConfirm, playSuccessSound } from './feedback'
 import { type Product, type CartItem, type Order } from './types'
 import { rowToProduct, rowToOrder } from './lib/mappers'
 import { BRAND_NAME } from './components/Brand'
@@ -74,6 +74,7 @@ export default function App() {
   useEffect(() => { document.title = page === 'login' ? `Masuk · ${BRAND_NAME}` : `${PAGE_TITLES[page] ?? 'Dashboard'} · ${BRAND_NAME}` }, [page])
   const fail = (e: unknown) => setNotice((e as Error).message)
   const toast = useToast()
+  const ask = useConfirm()
 
   function navigate(p: string, opts?: { replace?: boolean }) {
     let target = p as Page
@@ -142,6 +143,18 @@ export default function App() {
     if (!session) { requireLogin(); toast('Silakan masuk dulu untuk membeli produk'); return }
     setCart(prev => prev.find(i => i.product.id === p.id) ? prev : [...prev, { product: p, qty: 1 }])
     toast(`${p.name} ditambahkan ke keranjang`)
+  }
+
+  async function cancelCart() {
+    const ok = await ask({
+      title: 'Batalkan keranjang?',
+      description: `${cart.length} item akan dihapus dari keranjang.`,
+      confirmLabel: 'Ya, batalkan',
+      danger: true,
+    })
+    if (!ok) return
+    setCart([])
+    toast('Keranjang dibatalkan')
   }
 
   // Muat ulang data terbaru dari Supabase setelah checkout selesai.
@@ -215,7 +228,7 @@ export default function App() {
         </div>
       </main>
 
-      {page !== 'checkout' && <CartBar cart={cart} onCheckout={() => navigate('checkout')} />}
+      {page !== 'checkout' && <CartBar cart={cart} onCheckout={() => navigate('checkout')} onCancel={cancelCart} />}
       <SupportButton raised={cart.length > 0 && page !== 'checkout'} />
       {detailOrder && <OrderDetailModal order={detailOrder} onClose={() => setDetailOrder(null)} />}
     </div>
