@@ -71,7 +71,6 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
 // ─── Stat Card — compact horizontal, monochrome icon ──────────────────────────
 
 export function StatCard({ icon, label, value, tone, loading }: { icon: string; label: string; value: string; tone: 'success' | 'warning' | 'danger'; loading?: boolean }) {
-  const dot = { success: '#22c55e', warning: '#f59e0b', danger: '#ef4444' }[tone]
   return (
     <div className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
       <div className="icon-tile">
@@ -79,9 +78,7 @@ export function StatCard({ icon, label, value, tone, loading }: { icon: string; 
         <img src={icon} alt="" width={24} height={24} draggable={false} className="block w-6 h-6 select-none" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-muted-foreground flex items-center gap-2 truncate">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dot }} />{label}
-        </p>
+        <p className="text-[13px] text-muted-foreground truncate">{label}</p>
         {loading ? <div className="skeleton h-6 w-10 rounded-md mt-1" /> : <p className="text-xl font-semibold text-white tracking-tight tabular mt-0.5">{value}</p>}
       </div>
     </div>
