@@ -2,6 +2,7 @@ import { displayName, displayHandle, type Row, type SessionUser } from '../lib/s
 import { Icon, formatRp, type IconName } from '../ui'
 import { type CartItem } from '../types'
 import { BrandMark, Avatar } from './Brand'
+import { NotificationBell } from './NotificationBell'
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +124,8 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
       </div>
 
       <div className="flex items-center gap-1.5">
+        {user && <NotificationBell userId={user.id} />}
+
         {user && (
           <button onClick={onSettingsClick} aria-label="Pengaturan" className="btn btn-ghost btn-icon">
             <Icon name="settings" size={18} />

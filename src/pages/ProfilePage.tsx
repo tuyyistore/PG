@@ -27,6 +27,11 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
     } catch (e) { setErr((e as Error).message) } finally { setSaving(false) }
   }
 
+  async function copyUserId() {
+    try { await navigator.clipboard.writeText(profile?.user_code ?? ''); toast('ID pengguna disalin: ' + profile?.user_code) }
+    catch { toast('Gagal menyalin ID pengguna', 'error') }
+  }
+
   async function pickAvatar(file: File) {
     if (file.size > MAX_AVATAR_MB * 1024 * 1024) { setErr(`Ukuran foto maksimal ${MAX_AVATAR_MB} MB`); return }
     setUploading(true); setErr('')
@@ -73,6 +78,16 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
             <input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="Nama kamu" />
           </label>
         </div>
+        {profile?.user_code && (
+          <div className="px-5 sm:px-6 pb-6">
+            <span className="label">ID Pengguna</span>
+            <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5 max-w-md">
+              <span className="text-[13px] font-medium text-white flex-1 truncate font-mono">{profile.user_code}</span>
+              <button onClick={copyUserId} className="btn btn-ghost btn-sm" aria-label="Salin ID pengguna"><Icon name="copy" size={14} /> Salin ID</button>
+            </div>
+            <p className="hint mt-1.5">Sebutkan ID ini saat menghubungi admin.</p>
+          </div>
+        )}
       </section>
 
       {/* Contact section */}

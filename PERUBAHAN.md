@@ -1,5 +1,27 @@
 # Ringkasan Perubahan
 
+## Notifikasi & pesan admin, ID pengguna (terbaru)
+
+- **Database:** jalankan `supabase/migration_v11.sql` (setelah v10) di Supabase → SQL Editor. Tidak ada env baru.
+  Isinya: kolom `profiles.user_code`, tabel `notifications` + `notification_batches`, dan fungsi
+  `admin_send_notification`, `notifications_mark_read`. **Jalankan bersamaan dengan deploy kode terbaru.**
+- **ID pengguna:** tiap akun punya ID unik `USR-XXXXXXXX` (dibuat otomatis oleh trigger, tidak bisa diubah
+  dari client, akun lama otomatis mendapat ID). Tampil di **Pengaturan** (tombol Salin ID) dan di
+  **Admin → Pengguna** (daftar + Detail). Pencarian pengguna di admin kini bisa lewat email, ID, atau username.
+- **Tombol lonceng notifikasi** di header (`src/components/NotificationBell.tsx`): badge jumlah belum dibaca,
+  panel daftar pesan, tandai dibaca (per pesan / semua), hapus pesan. Pesan baru dicek tiap ±45 detik
+  dan memunculkan toast. User **hanya** bisa membaca notifikasi miliknya sendiri (Row Level Security).
+- **Admin → tab Pesan** (`src/components/AdminMessages.tsx`):
+  - **Satu pengguna:** isi email, ID pengguna (`USR-…`), UUID, atau `@username`. Ada pratinjau pengguna yang cocok.
+    Tombol **Kirim Pesan** juga ada di Detail Pengguna (tujuan terisi otomatis).
+  - **Semua pengguna:** ada dialog konfirmasi. Akun admin pengirim tidak ikut menerima.
+  - **Riwayat pesan:** 50 pengiriman terakhir; tombol hapus **menarik** pesan dari notifikasi penerima.
+- **Tipe notifikasi dirapikan** (`src/lib/notifications.ts`, satu sumber untuk label/ikon/warna):
+  `info` · `pesanan` · `saldo` · `promo` · `peringatan`. Daftar yang sama dijaga oleh check constraint di database.
+  Menambah tipe baru: ubah `NOTIF_TYPES` + `NOTIF_META` dan constraint `type` di database.
+- Catatan: pesan "semua pengguna" disalin per penerima saat dikirim, jadi pengguna yang mendaftar sesudahnya
+  tidak menerima pesan lama.
+
 ## Penghapusan DOKU & Preflix (terbaru)
 
 - **DOKU dihapus:** `api/_doku.js`, `api/_paymentMethods.js`, `api/create-payment.js`,

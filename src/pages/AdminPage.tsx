@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, uploadFile, type Row } from '../lib/supabase'
 import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from '../ui'
 import { useConfirm, useToast } from '../feedback'
+import { AdminMessages } from '../components/AdminMessages'
+import { rowHandle } from '../lib/notifications'
 
 const MUTED = { color: '#94a3b8' }
 const FIELD = 'input input-sm'
 const FIELD_STYLE = {} as React.CSSProperties
-const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna']] as const
+const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna'], ['pesan', 'Pesan']] as const
 const EMPTY = { name: '', category: '', tagline: '', price: '', original_price: '', period: '/bln', features: '', badge: '', popular: false, logo_url: '' }
 const MAX_LOGO_MB = 10
 
@@ -61,6 +63,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const [detailUser, setDetailUser] = useState<Row | null>(null)
   const [saldoAmount, setSaldoAmount] = useState('')
   const [orderNotes, setOrderNotes] = useState<Record<number, string>>({})
+  const [msgPrefill, setMsgPrefill] = useState<{ target: string; n: number } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -98,6 +101,15 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       await navigator.clipboard.writeText(code)
       toast('Kode order disalin: ' + code)
     } catch { toast('Gagal menyalin ID pesanan', 'error') }
+  }
+
+  const copyUserId = async (code: string) => {
+    try { await navigator.clipboard.writeText(code); toast('ID pengguna disalin: ' + code) }
+    catch { toast('Gagal menyalin ID pengguna', 'error') }
+  }
+  const messageUser = (u: Row) => {
+    setMsgPrefill({ target: u.user_code ?? u.email ?? '', n: Date.now() })
+    setDetailUser(null); setSaldoAmount(''); setTab('pesan')
   }
 
   const oq = orderSearch.trim().toLowerCase()
@@ -345,27 +357,30 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
 
       {loaded && tab === 'pengguna' && (() => {
         const q = emailSearch.trim().toLowerCase()
-        const filtered = q ? d.users.filter(u => (u.email ?? '').toLowerCase().includes(q)) : d.users
+        const filtered = q ? d.users.filter(u => [u.email, u.user_code, u.username, u.full_name].some(v => String(v ?? '').toLowerCase().includes(q))) : d.users
         return (
           <div className="space-y-4">
             <div className="card p-4 sm:p-5 space-y-2">
-              <Field label="Cek email pengguna">
+              <Field label="Cari pengguna (email, ID pengguna, atau username)">
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={MUTED}><Icon name="search" size={16} /></span>
-                  <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. nama@gmail.com" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
+                  <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. nama@gmail.com atau USR-K7M2QX9P" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
                 </div>
               </Field>
-              {q && <p className="hint">{filtered.length > 0 ? `Ditemukan ${filtered.length} email cocok.` : 'Email tidak terdaftar.'}</p>}
+              {q && <p className="hint">{filtered.length > 0 ? `Ditemukan ${filtered.length} pengguna cocok.` : 'Pengguna tidak terdaftar.'}</p>}
             </div>
             <div className="card overflow-hidden">
               {filtered.length === 0 ? (
-                <EmptyState icon="users" title={q ? `Tidak ada pengguna dengan email mengandung "${emailSearch}"` : 'Belum ada pengguna.'} />
+                <EmptyState icon="users" title={q ? `Tidak ada pengguna yang cocok dengan "${emailSearch}"` : 'Belum ada pengguna.'} />
               ) : (
                 <div className="divide-y divide-white/[0.06]">
                   {filtered.map(u => (
                     <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 transition-colors duration-200 hover:bg-white/[0.02]">
                       <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="mail" size={16} /></div>
-                      <div className="min-w-0 flex-1"><p className="text-sm font-medium text-white truncate">{u.email ?? '(tanpa email)'}</p></div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white truncate">{rowHandle(u)}</p>
+                        {u.user_code && <p className="text-[11px] text-muted-foreground font-mono truncate">{u.user_code}</p>}
+                      </div>
                       <Btn onClick={() => setDetailUser(u)} variant="secondary"><Icon name="eye" size={14} /> Detail</Btn>
                     </div>
                   ))}
@@ -375,6 +390,8 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
           </div>
         )
       })()}
+
+      {loaded && tab === 'pesan' && <AdminMessages users={d.users} prefill={msgPrefill} />}
 
       {loaded && tab === 'topup' && (
         <div className="card overflow-hidden">
@@ -404,13 +421,17 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
           <div className="flex items-center gap-3">
             <div className="icon-tile" style={{ width: 44, height: 44 }}><Icon name="mail" size={18} /></div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{detailUser.email ?? '(tanpa email)'}</p>
+              <p className="text-sm font-semibold text-white truncate">{rowHandle(detailUser)}</p>
               <p className="text-xs text-muted-foreground">{detailUser.full_name ?? 'Tanpa nama'}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="card-inset p-3"><p className="text-[11px] text-muted-foreground">Bergabung</p><p className="text-[13px] text-white font-medium mt-0.5">{new Date(detailUser.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
             <div className="card-inset p-3"><p className="text-[11px] text-muted-foreground">Saldo sekarang</p><p className="text-[13px] text-white font-medium tabular mt-0.5">{formatRp(detailUser.saldo ?? 0)}</p></div>
+            <div className="card-inset p-3 col-span-2 flex items-center gap-2">
+              <div className="min-w-0 flex-1"><p className="text-[11px] text-muted-foreground">ID pengguna</p><p className="text-[13px] text-white font-medium font-mono mt-0.5 truncate">{detailUser.user_code ?? '-'}</p></div>
+              {detailUser.user_code && <button onClick={() => copyUserId(detailUser.user_code)} className="btn btn-ghost btn-sm" aria-label="Salin ID pengguna"><Icon name="copy" size={14} /> Salin</button>}
+            </div>
             <div className="card-inset p-3 col-span-2"><p className="text-[11px] text-muted-foreground">Nomor HP / WhatsApp</p><p className="text-[13px] text-white font-medium mt-0.5">{detailUser.whatsapp || '-'}</p></div>
           </div>
           <Field label="Nominal (Rp)">
@@ -420,6 +441,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
             <button onClick={() => adjustSaldo(Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-primary"><Icon name="plus" size={15} /> Tambah Saldo</button>
             <button onClick={() => adjustSaldo(-Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-secondary"><Icon name="wallet" size={15} /> Refund / Kembalikan</button>
           </div>
+          <button onClick={() => messageUser(detailUser)} className="btn btn-secondary w-full"><Icon name="send" size={15} /> Kirim Pesan ke Pengguna Ini</button>
         </Modal>
       )}
     </div>

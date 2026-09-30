@@ -17,7 +17,7 @@ export const displayName = (u: SessionUser) => u.user_metadata?.full_name || u.u
 // Login username/password memakai akun Supabase Auth biasa, tapi GoTrue mewajibkan
 // kolom "email". Jadi username diubah jadi email palsu di domain internal ini —
 // tidak pernah benar-benar dikirimi surel, hanya dipakai sebagai identitas login.
-const USERNAME_DOMAIN = 'users.tuyyistore.internal'
+export const USERNAME_DOMAIN = 'users.tuyyistore.internal'
 const usernameToEmail = (username: string) => `${username.trim().toLowerCase()}@${USERNAME_DOMAIN}`
 /** Untuk ditampilkan di UI: akun username → "@username", akun Google/GitHub → email asli. */
 export const displayHandle = (u: SessionUser): string => {
