@@ -1,0 +1,13 @@
+{
+  "name": "Tuyyi Store",
+  "short_name": "Tuyyi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "id",
+  "icons": [
+    { "src": "/favicon.webp", "sizes": "any", "type": "image/webp", "purpose": "any" }
+  ]
+}

@@ -568,25 +568,7 @@ body {
 }
 
 
-/* ─── Proteksi konten: blok zoom, seleksi teks, simpan/seret gambar ─────────── */
 html, body {
-  touch-action: pan-x pan-y;            /* matikan pinch & double-tap zoom */
   -webkit-text-size-adjust: 100%;
-  -webkit-touch-callout: none;          /* iOS: tanpa menu tahan-lama */
   -webkit-tap-highlight-color: transparent;
-}
-body, body * {
-  -webkit-user-select: none;
-  user-select: none;
-}
-input, textarea, select, [contenteditable="true"], [data-allow-copy], [data-allow-copy] * {
-  -webkit-user-select: text;
-  user-select: text;
-  -webkit-touch-callout: default;
-}
-img, svg, video, canvas {
-  -webkit-user-drag: none;
-  user-drag: none;
-  -webkit-touch-callout: none;
-  pointer-events: none;                 /* tahan-lama tidak memunculkan "Simpan gambar" */
 }

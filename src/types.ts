@@ -17,6 +17,7 @@ export interface Product {
   iconColor: string
   icon: IconName
   logoUrl?: string
+  available?: number | null
 }
 
 export interface CartItem { product: Product; qty: number }

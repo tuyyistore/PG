@@ -5,6 +5,7 @@ import { type Product, type CartItem } from '../types'
 // ─── Product Card ─────────────────────────────────────────────────────────────
 
 export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Product; onAdd: () => void; inCart: boolean; expanded: boolean; onToggle: () => void }) {
+  const soldOut = p.available != null && p.available <= 0
   return (
     <div
       className="card card-interactive overflow-hidden relative"
@@ -24,6 +25,8 @@ export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Produ
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-[15px] font-semibold text-white tracking-tight">{p.name}</p>
             {p.badge && <span className={`badge ${p.popular ? 'badge-primary' : 'badge-neutral'}`}>{p.badge}</span>}
+            {soldOut && <span className="badge badge-neutral">Stok habis</span>}
+            {!soldOut && p.available != null && p.available <= 5 && <span className="badge badge-neutral">Sisa {p.available}</span>}
           </div>
           <p className="text-[13px] text-muted-foreground truncate mt-0.5">{p.tagline || p.category}</p>
         </div>
@@ -53,11 +56,11 @@ export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Produ
             )}
             <button
               onClick={onAdd}
-              disabled={inCart}
-              className={`btn btn-block ${inCart ? '' : 'btn-primary'}`}
+              disabled={inCart || soldOut}
+              className={`btn btn-block ${inCart || soldOut ? '' : 'btn-primary'}`}
               style={inCart ? { background: 'rgba(34,197,94,0.1)', color: '#4ade80', borderColor: 'rgba(34,197,94,0.2)', opacity: 1, cursor: 'default' } : undefined}
             >
-              {inCart ? <><Icon name="check" size={16} strokeWidth={2.25} /> Ditambahkan</> : <><Icon name="cart" size={16} /> Tambah ke Keranjang</>}
+              {inCart ? <><Icon name="check" size={16} strokeWidth={2.25} /> Ditambahkan</> : soldOut ? 'Stok habis' : <><Icon name="cart" size={16} /> Tambah ke Keranjang</>}
             </button>
           </div>
         </div>
@@ -71,10 +74,13 @@ export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Produ
 export function ProdukPage({ cart, onAdd, products, categories, loading }: { cart: CartItem[]; onAdd: (p: Product) => void; products: Product[]; categories: string[]; loading?: boolean }) {
   const [tab, setTab] = useState('Semua')
   const [openId, setOpenId] = useState<Product['id'] | null>(null)
+  const [q, setQ] = useState('')
   // Tab kategori diambil langsung dari kategori yang dibuat admin di database,
   // jadi kategori baru otomatis muncul di sini tanpa perlu ubah kode.
   const tabs = ['Semua', ...categories]
-  const filtered = tab === 'Semua' ? products : products.filter(p => p.category === tab)
+  const needle = q.trim().toLowerCase()
+  const inTab = tab === 'Semua' ? products : products.filter(p => p.category === tab)
+  const filtered = !needle ? inTab : inTab.filter(p => `${p.name} ${p.tagline} ${p.category} ${p.features.join(' ')}`.toLowerCase().includes(needle))
   const cartIds = new Set(cart.map(i => i.product.id))
   const countFor = (t: string) => t === 'Semua' ? products.length : products.filter(p => p.category === t).length
 
@@ -98,6 +104,10 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
   return (
     <div className="space-y-6">
       <PageHeader title="Produk" subtitle="Pilih layanan yang ingin kamu beli." />
+      <div className="relative">
+        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-subtle"><Icon name="search" size={16} /></span>
+        <input className="input" style={{ paddingLeft: 40 }} value={q} onChange={e => setQ(e.target.value)} placeholder="Cari produk..." aria-label="Cari produk" />
+      </div>
       <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
         <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
           {tabs.map(t => (
@@ -112,7 +122,7 @@ export function ProdukPage({ cart, onAdd, products, categories, loading }: { car
         {loading ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">{[0, 1, 2, 3].map(i => <SkeletonCard key={i} height={82} />)}</div>
         ) : filtered.length === 0 ? (
-          <div className="card"><EmptyState icon="package" title="Belum ada produk." description="Produk di kategori ini akan tampil di sini." /></div>
+          <div className="card"><EmptyState icon="package" title={needle ? 'Produk tidak ditemukan.' : 'Belum ada produk.'} description={needle ? 'Coba kata kunci lain.' : 'Produk di kategori ini akan tampil di sini.'} /></div>
         ) : (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
             {filtered.map(p => (

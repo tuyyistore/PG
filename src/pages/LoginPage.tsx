@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { configured, signInWithGoogle, signInWithGitHub, signInWithUsername, signUpWithUsername, type Session } from '../lib/supabase'
+import { configured, signInWithGoogle, signInWithGitHub, signInWithUsername, signUpWithUsername, TURNSTILE_SITE_KEY, type Session } from '../lib/supabase'
 import { Icon } from '../ui'
 import { BrandMark } from '../components/Brand'
+import { Turnstile } from '../components/Turnstile'
+import { openLiveChat } from '../components/Layout'
 
 // ─── Login Page ───────────────────────────────────────────────────────────────
 // Tiga cara masuk: Google, GitHub, atau username + password (akun dibuat &
@@ -18,19 +20,24 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
   const [err, setErr] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<'google' | 'github' | null>(null)
+  const [captcha, setCaptcha] = useState('')
+  const [captchaReset, setCaptchaReset] = useState(0)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!username.trim() || !password) { setErr('Username dan password wajib diisi.'); return }
+    if (mode === 'signup' && whatsapp.replace(/\D/g, '').length < 9) { setErr('Nomor WhatsApp wajib diisi (dipakai untuk pemulihan akun).'); return }
+    if (TURNSTILE_SITE_KEY && !captcha) { setErr('Selesaikan verifikasi captcha dulu.'); return }
     setLoading(true); setErr('')
     try {
       const session = mode === 'login'
-        ? await signInWithUsername(username, password)
-        : await signUpWithUsername(username, password, whatsapp)
+        ? await signInWithUsername(username, password, captcha || undefined)
+        : await signUpWithUsername(username, password, whatsapp, captcha || undefined)
       onAuthed(session)
     } catch (e: any) {
       setErr(e?.message || 'Gagal memproses permintaan. Coba lagi.')
       setLoading(false)
+      setCaptchaReset(n => n + 1)
     }
   }
 
@@ -55,7 +62,7 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
         <div className="card p-6 sm:p-8">
           <h1 className="text-xl font-semibold text-white tracking-tight">{mode === 'login' ? 'Masuk ke akun' : 'Buat akun baru'}</h1>
           <p className="hint mt-2 mb-6">
-            {mode === 'login' ? 'Pilih salah satu cara masuk di bawah ini.' : 'Cukup username, password, dan nomor WhatsApp (opsional).'}
+            {mode === 'login' ? 'Pilih salah satu cara masuk di bawah ini.' : 'Cukup username, password, dan nomor WhatsApp.'}
           </p>
 
           <div className="grid grid-cols-2 gap-2.5">
@@ -115,7 +122,7 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
 
             {mode === 'signup' && (
               <label className="block">
-                <span className="label">Nomor WhatsApp <span className="text-subtle font-normal">(opsional)</span></span>
+                <span className="label">Nomor WhatsApp</span>
                 <div className="relative">
                   <Icon name="phone" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
                   <input className="input" style={{ paddingLeft: 36 }} value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
@@ -124,14 +131,22 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
               </label>
             )}
 
+            {TURNSTILE_SITE_KEY && <Turnstile siteKey={TURNSTILE_SITE_KEY} onToken={setCaptcha} resetKey={captchaReset} />}
+
             {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5" /><span>{err}</span></div>}
 
-            <button type="submit" disabled={!configured || loading} className="btn btn-primary btn-lg btn-block">
+            <button type="submit" disabled={!configured || loading || Boolean(TURNSTILE_SITE_KEY && !captcha)} className="btn btn-primary btn-lg btn-block">
               {loading
                 ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Memproses...</>
                 : mode === 'login' ? 'Masuk' : 'Buat Akun'}
             </button>
           </form>
+
+          {mode === 'login' && (
+            <p className="hint text-center mt-4">
+              Lupa password? <button type="button" onClick={openLiveChat} className="text-white font-medium hover:underline">Hubungi admin</button> dengan menyebut username dan nomor WhatsApp akunmu.
+            </p>
+          )}
 
           <p className="hint text-center mt-4">
             {mode === 'login' ? (

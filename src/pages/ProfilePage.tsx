@@ -32,6 +32,26 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
     catch { toast('Gagal menyalin ID pengguna', 'error') }
   }
 
+  const [refInput, setRefInput] = useState('')
+  const [refBusy, setRefBusy] = useState(false)
+  const refLink = profile?.user_code ? `${location.origin}/?ref=${profile.user_code}` : ''
+
+  async function copyRefLink() {
+    try { await navigator.clipboard.writeText(refLink); toast('Link referral disalin') }
+    catch { toast('Gagal menyalin link referral', 'error') }
+  }
+
+  async function applyRef() {
+    if (!refInput.trim()) return
+    setRefBusy(true); setErr('')
+    try {
+      await api('rpc/apply_referral', { method: 'POST', body: { p_code: refInput.trim() } })
+      onSaved({ referred_by: 'set' })
+      setRefInput('')
+      toast('Kode referral berhasil dipakai')
+    } catch (e) { setErr((e as Error).message) } finally { setRefBusy(false) }
+  }
+
   async function pickAvatar(file: File) {
     if (file.size > MAX_AVATAR_MB * 1024 * 1024) { setErr(`Ukuran foto maksimal ${MAX_AVATAR_MB} MB`); return }
     setUploading(true); setErr('')
@@ -89,6 +109,31 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
           </div>
         )}
       </section>
+
+      {profile?.user_code && (
+        <section className="card">
+          <div className="px-5 sm:px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <h2 className="section-title">Ajak teman</h2>
+            <p className="hint mt-1">Bagikan link ini. Kamu dapat bonus saldo Rp 2.000 saat temanmu menyelesaikan pembelian pertamanya.</p>
+          </div>
+          <div className="px-5 sm:px-6 py-6 space-y-5">
+            <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5 max-w-xl">
+              <span className="text-[13px] font-medium text-white flex-1 truncate font-mono">{refLink}</span>
+              <button onClick={copyRefLink} className="btn btn-ghost btn-sm" aria-label="Salin link referral"><Icon name="copy" size={14} /> Salin</button>
+            </div>
+            {!profile?.referred_by && (
+              <div className="max-w-md">
+                <span className="label">Punya kode referral dari teman?</span>
+                <div className="flex gap-2">
+                  <input className="input" value={refInput} onChange={e => setRefInput(e.target.value.toUpperCase())} placeholder="USR-XXXXXXXX" />
+                  <button onClick={applyRef} disabled={refBusy || !refInput.trim()} className="btn btn-secondary flex-shrink-0">{refBusy ? '...' : 'Pakai'}</button>
+                </div>
+                <p className="hint mt-1.5">Hanya bisa dipakai sebelum pembelian pertama.</p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Contact section */}
       <section className="card">

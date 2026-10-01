@@ -29,6 +29,26 @@ export function CopyCodeButton({ code, label = 'Kode order' }: { code: string; l
   )
 }
 
+function printReceipt(order: Order) {
+  const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+  const w = window.open('', '_blank', 'width=480,height=720')
+  if (!w) return
+  w.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Struk ${esc(order.id)}</title>
+<style>body{font-family:Inter,Arial,sans-serif;color:#111;max-width:380px;margin:24px auto;padding:0 16px}h1{font-size:18px;margin:0 0 4px}
+.m{color:#555;font-size:12px}hr{border:0;border-top:1px dashed #999;margin:14px 0}.r{display:flex;justify-content:space-between;font-size:14px;margin:6px 0}
+.t{font-weight:700;font-size:16px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#f3f4f6;padding:10px;border-radius:8px}</style></head><body>
+<h1>TUYYI STORE</h1><p class="m">Struk pembelian</p><hr>
+<div class="r"><span>Kode order</span><span>${esc(order.id)}</span></div>
+<div class="r"><span>Tanggal</span><span>${esc(order.date)}</span></div>
+<div class="r"><span>Produk</span><span>${esc(order.product.name)}</span></div>
+<div class="r"><span>Status</span><span>${esc(order.status)}</span></div><hr>
+<div class="r t"><span>Total dibayar</span><span>${esc(formatRp(order.product.price))}</span></div><hr>
+<p class="m">Simpan struk ini sebagai bukti pembelian. Bantuan: tuyyi.store</p></body></html>`)
+  w.document.close()
+  w.focus()
+  setTimeout(() => w.print(), 300)
+}
+
 // ─── Detail Pesanan Modal (data akun/info penting yang dikirim admin) ─────────
 
 export function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
@@ -57,6 +77,7 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
               <p className="hint">Belum ada data yang dikirim admin untuk pesanan ini. Silakan hubungi support jika perlu.</p>
             )}
           </div>
+          <button type="button" onClick={() => printReceipt(order)} className="btn btn-secondary btn-sm mt-3"><Icon name="clipboard" size={14} /> Cetak / Unduh Struk</button>
           <p className="text-xs text-muted-foreground mt-3">
             Butuh bantuan aktivasi akun/data?{' '}
             <button type="button" onClick={openLiveChat} className="text-[#4f7cff] hover:text-[#5e89ff] hover:underline transition-colors">Hubungi admin</button>

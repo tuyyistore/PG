@@ -1,2 +1,10 @@
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /admin
+Disallow: /checkout
+Disallow: /pengaturan
+Disallow: /pesanan
+Disallow: /topup
+Disallow: /login
+
+Sitemap: https://www.tuyyi.store/sitemap.xml

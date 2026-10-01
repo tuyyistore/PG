@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ADMIN_EMAIL, api, initSession, signOut, type Row, type Session } from './lib/supabase'
+import { captureReferral, applyStoredReferral } from './lib/referral'
 import { Icon } from './ui'
 import { useToast, useConfirm, playSuccessSound } from './feedback'
 import { type Product, type CartItem, type Order } from './types'
@@ -96,8 +97,12 @@ export default function App() {
 
   async function loadProducts() {
     try {
-      const rows = await api('products?select=*&active=eq.true&order=sort,id')
-      setProducts(rows.map(rowToProduct))
+      const [rows, counts] = await Promise.all([
+        api('products?select=*&active=eq.true&order=sort,id'),
+        api('rpc/get_stock_counts', { method: 'POST', body: {} }).catch(() => [] as Row[]),
+      ])
+      const avail = new Map<number, number | null>(counts.map((c: Row): [number, number | null] => [Number(c.product_id), c.available === null ? null : Number(c.available)]))
+      setProducts(rows.map(r => ({ ...rowToProduct(r), available: avail.get(r.id) ?? null })))
     } catch (e) { fail(e) }
   }
   // Kategori 100% dari database (tabel `categories`), dikelola admin — dipakai
@@ -124,7 +129,11 @@ export default function App() {
     }).finally(() => setBooting(false))
     refreshCatalog()
   }, [])
-  useEffect(() => { if (session) loadMine(session.user.id); else setMineLoaded(true) }, [session?.user.id])
+  useEffect(() => { captureReferral() }, [])
+  useEffect(() => {
+    if (!session) { setMineLoaded(true); return }
+    applyStoredReferral().finally(() => loadMine(session.user.id))
+  }, [session?.user.id])
 
   // Jaga URL tetap valid: path tak dikenal / admin untuk non-admin → Dashboard,
   // halaman yang wajib login tanpa sesi (akses langsung lewat URL / tombol back) → Masuk,
@@ -141,6 +150,7 @@ export default function App() {
   function addToCart(p: Product) {
     // Lihat-lihat produk boleh tanpa akun, tapi begitu mau beli wajib login dulu.
     if (!session) { requireLogin(); toast('Silakan masuk dulu untuk membeli produk'); return }
+    if (p.available != null && p.available <= 0) { toast('Stok produk ini habis', 'error'); return }
     setCart(prev => prev.find(i => i.product.id === p.id) ? prev : [...prev, { product: p, qty: 1 }])
     toast(`${p.name} ditambahkan ke keranjang`)
   }

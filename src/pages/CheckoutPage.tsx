@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, type Row } from '../lib/supabase'
 import { Icon, formatRp, ProductThumb, PageHeader } from '../ui'
 import { type CartItem } from '../types'
@@ -8,15 +8,37 @@ import { type CartItem } from '../types'
 export function CheckoutPage({ cart, saldo, profile, onBack, onBoughtWithSaldo, onGoTopUp }: { cart: CartItem[]; saldo: number; profile: Row | null; onBack: () => void; onBoughtWithSaldo: () => void; onGoTopUp: () => void }) {
   const [buying, setBuying] = useState(false)
   const [err, setErr] = useState('')
-  const total = cart.reduce((s, i) => s + i.product.price, 0)
+  const subtotal = cart.reduce((s, i) => s + i.product.price, 0)
+  const [code, setCode] = useState('')
+  const [applied, setApplied] = useState<{ code: string; discount: number } | null>(null)
+  const [voucherMsg, setVoucherMsg] = useState('')
+  const [checking, setChecking] = useState(false)
+  const discount = applied?.discount ?? 0
+  const total = Math.max(subtotal - discount, 0)
   const cukup = saldo >= total
+
+  useEffect(() => { setApplied(null); setVoucherMsg('') }, [subtotal])
+
+  async function applyVoucher() {
+    const c = code.trim()
+    if (!c) return
+    setChecking(true); setVoucherMsg('')
+    try {
+      const rows = await api('rpc/check_voucher', { method: 'POST', body: { p_code: c, p_total: subtotal } })
+      const r = rows?.[0]
+      if (r?.valid) { setApplied({ code: c, discount: Number(r.discount) }); setVoucherMsg('') }
+      else { setApplied(null); setVoucherMsg(r?.message ?? 'Voucher tidak valid') }
+    } catch (e) { setApplied(null); setVoucherMsg((e as Error).message) } finally { setChecking(false) }
+  }
+
+  function removeVoucher() { setApplied(null); setCode(''); setVoucherMsg('') }
 
   async function buyWithSaldo() {
     setBuying(true); setErr('')
     try {
-      await api('rpc/buy_with_saldo', { method: 'POST', body: { item_ids: cart.map(i => i.product.id) } })
+      await api('rpc/buy_with_saldo', { method: 'POST', body: { item_ids: cart.map(i => i.product.id), voucher_code: applied?.code ?? null } })
       onBoughtWithSaldo()
-    } catch (e) { setErr('Gagal memproses pembelian. Coba lagi.'); setBuying(false) }
+    } catch (e) { setErr((e as Error).message || 'Gagal memproses pembelian. Coba lagi.'); setBuying(false) }
   }
 
   return (
@@ -59,10 +81,25 @@ export function CheckoutPage({ cart, saldo, profile, onBack, onBoughtWithSaldo, 
         <div className="card p-5 sm:p-6 lg:sticky lg:top-24 space-y-4">
           <h2 className="section-title">Pembayaran</h2>
           <dl className="space-y-3 text-sm">
-            <div className="flex justify-between"><dt className="text-muted-foreground">Subtotal ({cart.length} item)</dt><dd className="text-white tabular">{formatRp(total)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">Subtotal ({cart.length} item)</dt><dd className="text-white tabular">{formatRp(subtotal)}</dd></div>
+            {discount > 0 && <div className="flex justify-between"><dt className="text-muted-foreground">Voucher {applied?.code}</dt><dd className="tabular" style={{ color: '#4ade80' }}>- {formatRp(discount)}</dd></div>}
             <div className="flex justify-between"><dt className="text-muted-foreground">Saldo kamu</dt><dd className="text-white tabular">{formatRp(saldo)}</dd></div>
           </dl>
           <div className="divider" />
+          {applied ? (
+            <div className="flex items-center justify-between gap-2 card-inset px-3.5 py-2.5">
+              <span className="text-[13px] text-white font-medium truncate">Voucher {applied.code} dipakai</span>
+              <button type="button" onClick={removeVoucher} className="btn btn-ghost btn-sm">Hapus</button>
+            </div>
+          ) : (
+            <div>
+              <div className="flex gap-2">
+                <input className="input" value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="Kode voucher" aria-label="Kode voucher" onKeyDown={e => { if (e.key === 'Enter') applyVoucher() }} />
+                <button type="button" onClick={applyVoucher} disabled={checking || !code.trim()} className="btn btn-secondary flex-shrink-0">{checking ? '...' : 'Pakai'}</button>
+              </div>
+              {voucherMsg && <p className="text-xs mt-1.5" style={{ color: '#f87171' }}>{voucherMsg}</p>}
+            </div>
+          )}
           <div className="flex justify-between items-baseline">
             <span className="text-sm text-muted-foreground">Total</span>
             <span className="text-xl font-semibold text-white tabular">{formatRp(total)}</span>

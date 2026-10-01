@@ -11,6 +11,7 @@ export type Row = Record<string, any>
 const BASE = ((import.meta.env?.VITE_SUPABASE_URL as string | undefined) ?? '').replace(/\/$/, '')
 const KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY as string | undefined) ?? ''
 export const configured = Boolean(BASE && KEY)
+export const TURNSTILE_SITE_KEY = (import.meta.env?.VITE_TURNSTILE_SITE_KEY as string | undefined) ?? ''
 export const ADMIN_EMAIL = 'warungtuyyi@gmail.com' // hanya untuk UI; hak akses dijaga RLS di database
 export const displayName = (u: SessionUser) => u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.username || u.email || 'Pengguna'
 
@@ -61,6 +62,7 @@ function friendlyAuthError(raw: string): string {
   const m = raw.toLowerCase()
   if (m.includes('already registered') || m.includes('already exists')) return 'Username sudah dipakai, coba yang lain.'
   if (m.includes('invalid login credentials')) return 'Username atau password salah.'
+  if (m.includes('captcha')) return 'Verifikasi captcha gagal, muat ulang halaman lalu coba lagi.'
   if (m.includes('password') && m.includes('character')) return 'Password minimal 6 karakter.'
   if (m.includes('email not confirmed')) return 'Akun belum bisa dipakai: konfirmasi email masih aktif di pengaturan Supabase. Nonaktifkan "Confirm email" agar login username langsung jalan.'
   return raw
@@ -78,11 +80,12 @@ async function authRaw<T>(path: string, body: unknown): Promise<T> {
 }
 
 /** Daftar akun baru dengan username + password (WhatsApp opsional). Langsung login kalau berhasil. */
-export async function signUpWithUsername(username: string, password: string, whatsapp?: string): Promise<Session> {
+export async function signUpWithUsername(username: string, password: string, whatsapp?: string, captchaToken?: string): Promise<Session> {
   const d = await authRaw<any>('signup', {
     email: usernameToEmail(username),
     password,
     data: { username: username.trim(), full_name: username.trim(), whatsapp: whatsapp?.trim() || null },
+    ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
   })
   if (!d.access_token) throw new Error('Pendaftaran butuh konfirmasi email, padahal ini akun username. Nonaktifkan "Confirm email" di pengaturan Supabase Auth.')
   const s = toSession(d)
@@ -91,8 +94,11 @@ export async function signUpWithUsername(username: string, password: string, wha
 }
 
 /** Masuk dengan username + password yang sudah terdaftar. */
-export async function signInWithUsername(username: string, password: string): Promise<Session> {
-  const d = await authRaw<any>('token?grant_type=password', { email: usernameToEmail(username), password })
+export async function signInWithUsername(username: string, password: string, captchaToken?: string): Promise<Session> {
+  const d = await authRaw<any>('token?grant_type=password', {
+    email: usernameToEmail(username), password,
+    ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
+  })
   const s = toSession(d)
   keep(s)
   return s

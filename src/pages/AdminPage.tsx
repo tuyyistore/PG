@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, uploadFile, type Row } from '../lib/supabase'
+import { api, apiFn, uploadFile, type Row } from '../lib/supabase'
 import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from '../ui'
 import { useConfirm, useToast } from '../feedback'
 import { AdminMessages } from '../components/AdminMessages'
+import { AdminVouchers, AdminStock, AdminAudit, AdminSettings } from '../components/AdminExtras'
 import { rowHandle } from '../lib/notifications'
 
 const MUTED = { color: '#94a3b8' }
 const FIELD = 'input input-sm'
 const FIELD_STYLE = {} as React.CSSProperties
-const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna'], ['pesan', 'Pesan']] as const
-const EMPTY = { name: '', category: '', tagline: '', price: '', original_price: '', period: '/bln', features: '', badge: '', popular: false, logo_url: '' }
+const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna'], ['voucher', 'Voucher'], ['stok', 'Stok'], ['pesan', 'Pesan'], ['audit', 'Audit'], ['pengaturan', 'Pengaturan']] as const
+const EMPTY = { name: '', category: '', tagline: '', price: '', original_price: '', period: '/bln', features: '', badge: '', popular: false, logo_url: '', auto_delivery: false, stock: '' }
 const MAX_LOGO_MB = 10
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -68,8 +69,8 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const load = useCallback(async () => {
     try {
       const [orders, products, topups, users, categories] = await Promise.all([
-        api('orders?select=*&order=id.desc'), api('products?select=*&order=sort,id'),
-        api('topups?select=*&order=id.desc'), api('profiles?select=*&order=created_at.desc'),
+        api('orders?select=*&order=id.desc&limit=1000'), api('products?select=*&order=sort,id'),
+        api('topups?select=*&order=id.desc&limit=500'), api('profiles?select=*&order=created_at.desc&limit=1000'),
         api('categories?select=*&order=sort,id'),
       ])
       setD({ orders, products, topups, users, categories }); setErr('')
@@ -112,11 +113,50 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
     setDetailUser(null); setSaldoAmount(''); setTab('pesan')
   }
 
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [resetPw, setResetPw] = useState('')
   const oq = orderSearch.trim().toLowerCase()
-  const filteredOrders = !oq ? d.orders : d.orders.filter(o =>
+  const inRange = (iso: string) => {
+    const t = new Date(iso).getTime()
+    if (dateFrom && t < new Date(dateFrom + 'T00:00:00').getTime()) return false
+    if (dateTo && t > new Date(dateTo + 'T23:59:59').getTime()) return false
+    return true
+  }
+  const filteredOrders = d.orders.filter(o => inRange(o.created_at) && (!oq ||
     orderCode(o).toLowerCase().includes(oq) || `ord-${o.id}`.includes(oq) ||
-    (o.product_name ?? '').toLowerCase().includes(oq) || who(o.user_id).toLowerCase().includes(oq)
-  )
+    (o.product_name ?? '').toLowerCase().includes(oq) || who(o.user_id).toLowerCase().includes(oq)))
+
+  const downloadCsv = (name: string, rows: (string | number)[][]) => {
+    const esc = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const blob = new Blob(['\ufeff' + rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob); a.download = name; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }
+  const exportOrders = () => downloadCsv(`pesanan-${new Date().toISOString().slice(0, 10)}.csv`, [
+    ['Kode', 'Tanggal', 'Pembeli', 'Produk', 'Kategori', 'Harga', 'Status'],
+    ...filteredOrders.map(o => [orderCode(o), new Date(o.created_at).toLocaleString('id-ID'), who(o.user_id), o.product_name ?? '', o.category ?? '', o.price, o.status]),
+  ])
+  const exportUsers = () => downloadCsv(`pengguna-${new Date().toISOString().slice(0, 10)}.csv`, [
+    ['ID', 'Email/Username', 'Nama', 'WhatsApp', 'Saldo', 'Bergabung'],
+    ...d.users.map(u => [u.user_code ?? '', rowHandle(u), u.full_name ?? '', u.whatsapp ?? '', u.saldo ?? 0, new Date(u.created_at).toLocaleString('id-ID')]),
+  ])
+  const monthly = Array.from({ length: 6 }, (_, i) => {
+    const dt = new Date(new Date().getFullYear(), new Date().getMonth() - 5 + i, 1)
+    const total = d.orders.filter(o => o.status === 'aktif').filter(o => { const x = new Date(o.created_at); return x.getFullYear() === dt.getFullYear() && x.getMonth() === dt.getMonth() }).reduce((s, o) => s + Number(o.price), 0)
+    return { label: dt.toLocaleDateString('id-ID', { month: 'short' }), total }
+  })
+  const monthlyMax = Math.max(...monthly.map(m => m.total), 1)
+
+  async function doResetPassword() {
+    if (!detailUser) return
+    if (resetPw.length < 6) { setErr('Password baru minimal 6 karakter'); return }
+    try {
+      await apiFn('admin-reset-password', { method: 'POST', body: { user_id: detailUser.id, new_password: resetPw } })
+      setResetPw(''); setErr(''); toast('Password berhasil direset')
+    } catch (e) { setErr((e as Error).message) }
+  }
 
   const saveProduct = () => run(async () => {
     if (!form.name.trim() || !Number(form.price)) throw new Error('Nama dan harga wajib diisi')
@@ -127,12 +167,14 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       features: form.features.split(',').map(s => s.trim()).filter(Boolean),
       badge: form.badge.trim() || null, popular: form.popular,
       logo_url: form.logo_url || null,
+      auto_delivery: form.auto_delivery,
+      stock: form.auto_delivery || form.stock.trim() === '' ? null : Math.max(0, Math.floor(Number(form.stock) || 0)),
     }
     await (editId ? api(`products?id=eq.${editId}`, { method: 'PATCH', body }) : api('products', { method: 'POST', body: { ...body, sort: d.products.length } }))
     setForm(f => ({ ...EMPTY, category: f.category })); setEditId(null)
   }, editId ? 'Perubahan produk disimpan' : 'Produk berhasil ditambahkan')
   const startEdit = (p: Row) => {
-    setForm({ name: p.name, category: p.category, tagline: p.tagline ?? '', price: String(p.price), original_price: p.original_price ? String(p.original_price) : '', period: p.period ?? '', features: (p.features ?? []).join(', '), badge: p.badge ?? '', popular: !!p.popular, logo_url: p.logo_url ?? '' })
+    setForm({ name: p.name, category: p.category, tagline: p.tagline ?? '', price: String(p.price), original_price: p.original_price ? String(p.original_price) : '', period: p.period ?? '', features: (p.features ?? []).join(', '), badge: p.badge ?? '', auto_delivery: Boolean(p.auto_delivery), stock: p.stock === null || p.stock === undefined ? '' : String(p.stock), popular: !!p.popular, logo_url: p.logo_url ?? '' })
     setEditId(p.id); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -198,6 +240,22 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
+      {loaded && tab === 'ringkasan' && (
+        <div className="card p-4 sm:p-5">
+          <p className="section-title">Omzet 6 bulan terakhir</p>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-4">Pesanan berstatus aktif</p>
+          <div className="flex items-end gap-2 h-36">
+            {monthly.map(m => (
+              <div key={m.label} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full min-w-0">
+                <span className="text-[10px] text-muted-foreground tabular truncate max-w-full">{m.total > 0 ? formatRp(m.total) : ''}</span>
+                <div className="w-full rounded-md" style={{ height: `${Math.max((m.total / monthlyMax) * 100, 3)}%`, background: 'linear-gradient(180deg, #4d8dff 0%, #2657c9 100%)', opacity: m.total > 0 ? 1 : 0.25 }} />
+                <span className="text-[11px] text-muted-foreground">{m.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loaded && tab === 'pesanan' && (
         <div className="space-y-4">
           <div className="card p-4 sm:p-5 space-y-2">
@@ -207,6 +265,11 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                 <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. ORD-K7M2QX9P" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
               </div>
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Dari tanggal"><input className={FIELD} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></Field>
+              <Field label="Sampai tanggal"><input className={FIELD} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} /></Field>
+            </div>
+            <div className="flex justify-end pt-1"><Btn onClick={exportOrders} variant="secondary"><Icon name="upload" size={14} /> Ekspor CSV</Btn></div>
             {oq && <p className="hint">{filteredOrders.length > 0 ? `Ditemukan ${filteredOrders.length} pesanan cocok.` : 'Tidak ada pesanan yang cocok.'}</p>}
           </div>
           {filteredOrders.length === 0 ? (
@@ -315,6 +378,12 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                   <input type="checkbox" className="w-4 h-4 rounded accent-[#4f7cff]" checked={form.popular} onChange={e => setForm({ ...form, popular: e.target.checked })} /> Tandai populer
                 </label>
               </div>
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <label className="flex items-center gap-2.5 text-[13px] text-slate-200 h-9 cursor-pointer select-none">
+                  <input type="checkbox" className="w-4 h-4 rounded accent-[#4f7cff]" checked={form.auto_delivery} onChange={e => setForm({ ...form, auto_delivery: e.target.checked })} /> Kirim otomatis (dari stok)
+                </label>
+                {!form.auto_delivery && <Field label="Stok (kosong = tanpa batas)"><input className={FIELD} style={FIELD_STYLE} inputMode="numeric" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} /></Field>}
+              </div>
               <div className="flex gap-2 justify-end pt-1">
                 {editId && <Btn onClick={() => { setForm(f => ({ ...EMPTY, category: f.category })); setEditId(null) }} variant="ghost">Batal</Btn>}
                 <Btn onClick={saveProduct} variant="primary"><Icon name={editId ? 'check' : 'plus'} size={14} strokeWidth={2.25} /> {editId ? 'Simpan Perubahan' : 'Tambah Produk'}</Btn>
@@ -367,6 +436,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                   <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. nama@gmail.com atau USR-K7M2QX9P" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
                 </div>
               </Field>
+              <div className="flex justify-end pt-1"><Btn onClick={exportUsers} variant="secondary"><Icon name="upload" size={14} /> Ekspor CSV</Btn></div>
               {q && <p className="hint">{filtered.length > 0 ? `Ditemukan ${filtered.length} pengguna cocok.` : 'Pengguna tidak terdaftar.'}</p>}
             </div>
             <div className="card overflow-hidden">
@@ -392,6 +462,10 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       })()}
 
       {loaded && tab === 'pesan' && <AdminMessages users={d.users} prefill={msgPrefill} />}
+      {loaded && tab === 'voucher' && <AdminVouchers />}
+      {loaded && tab === 'stok' && <AdminStock products={d.products} />}
+      {loaded && tab === 'audit' && <AdminAudit />}
+      {loaded && tab === 'pengaturan' && <AdminSettings />}
 
       {loaded && tab === 'topup' && (
         <div className="card overflow-hidden">
@@ -417,7 +491,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       )}
 
       {detailUser && (
-        <Modal title="Detail Pengguna" onClose={() => { setDetailUser(null); setSaldoAmount('') }}>
+        <Modal title="Detail Pengguna" onClose={() => { setDetailUser(null); setSaldoAmount(''); setResetPw('') }}>
           <div className="flex items-center gap-3">
             <div className="icon-tile" style={{ width: 44, height: 44 }}><Icon name="mail" size={18} /></div>
             <div className="min-w-0">
@@ -441,6 +515,16 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
             <button onClick={() => adjustSaldo(Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-primary"><Icon name="plus" size={15} /> Tambah Saldo</button>
             <button onClick={() => adjustSaldo(-Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-secondary"><Icon name="wallet" size={15} /> Refund / Kembalikan</button>
           </div>
+          {String(detailUser.email ?? '').endsWith('@users.tuyyistore.internal') && (
+            <div className="space-y-2">
+              <Field label="Reset password akun username">
+                <div className="flex gap-2">
+                  <input className="input" type="text" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="Password baru (min. 6 karakter)" autoComplete="off" />
+                  <button onClick={doResetPassword} disabled={resetPw.length < 6} className="btn btn-secondary flex-shrink-0">Reset</button>
+                </div>
+              </Field>
+            </div>
+          )}
           <button onClick={() => messageUser(detailUser)} className="btn btn-secondary w-full"><Icon name="send" size={15} /> Kirim Pesan ke Pengguna Ini</button>
         </Modal>
       )}

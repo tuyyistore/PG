@@ -4,9 +4,10 @@ import { BrowserRouter } from 'react-router'
 import App from './App'
 import './index.css'
 import { ConfirmProvider, ToastProvider } from './feedback'
-import { installProtection } from './lib/protect'
 
-installProtection()
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}) })
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -1,5 +1,20 @@
 # Ringkasan Perubahan
 
+## Review besar v12 (terbaru)
+
+- **Database:** jalankan `supabase/migration_v12.sql` (setelah v11) **bersamaan dengan deploy kode terbaru**. `buy_with_saldo` berganti signature (ada parameter voucher), jadi kode lama tidak cocok dengan DB baru dan sebaliknya.
+- **Keamanan:** `.env` dihapus dari repo (pakai `.env.example`). Rotate `SUPABASE_SERVICE_ROLE_KEY` dan token GoPay lama. Admin kini dari tabel `admins` (`is_admin()` dan `api/_auth.js` sama-sama membaca tabel itu).
+- **Captcha:** isi `VITE_TURNSTILE_SITE_KEY` di Vercel, lalu aktifkan Captcha (Turnstile) di Supabase → Authentication → Attack Protection dengan secret key-nya. Tanpa env ini captcha tidak tampil.
+- **Reset password akun username:** Admin → Pengguna → Detail → Reset password (`api/admin-reset-password.js`, butuh `SUPABASE_SERVICE_ROLE_KEY` di Vercel). WhatsApp kini wajib saat daftar.
+- **SEO/PWA:** `noindex` dan blok zoom/copy dihapus, ada OG tags, `sitemap.xml`, `robots.txt` baru, `manifest.webmanifest` dan `sw.js`.
+- **Stok & auto-delivery:** produk bisa dicentang "Kirim otomatis" (isi stok di Admin → Stok, satu baris satu akun) atau diberi angka stok. Pembelian manual sekarang berstatus `pending` sampai admin mengisi data akun.
+- **Voucher:** Admin → Voucher, dipakai di Checkout. Satu voucher satu kali per user.
+- **Referral:** link `?ref=USR-XXXX` di Pengaturan. Bonus Rp 2.000 untuk pengajak setelah pembelian pertama teman (ubah `ref_bonus` di fungsi `buy_with_saldo`).
+- **Top up:** user buat permintaan dengan kode unik 1–99, transfer, konfirmasi via WA, admin setujui di Admin → Top Up. Isi info pembayaran di Admin → Pengaturan. Bukan otomatis penuh (belum ada payment gateway).
+- **Notifikasi WhatsApp:** trigger database mengisi tabel `wa_outbox`. Jalankan `startOutbox(sock)` dari `bot/wa-outbox.mjs` di bot Baileys-mu untuk mengirimnya.
+- **Admin:** audit log, omzet 6 bulan, filter tanggal, ekspor CSV pesanan/pengguna, batas muat 1000 baris.
+- **Lainnya:** pencarian produk, pesan error checkout asli dari server, struk cetak per pesanan.
+
 ## Notifikasi & pesan admin, ID pengguna (terbaru)
 
 - **Database:** jalankan `supabase/migration_v11.sql` (setelah v10) di Supabase → SQL Editor. Tidak ada env baru.
