@@ -246,7 +246,7 @@ export default function App() {
         {page === 'produk'    && <ProdukPage cart={cart} onAdd={addToCart} products={products} categories={categories} loading={!catalogLoaded} />}
         {page === 'pesanan'   && <PesananPage orders={orders} onDetail={setDetailOrder} loading={!mineLoaded}
           onRefresh={session ? () => loadMine(session.user.id) : undefined} />}
-        {page === 'saldo'     && <SaldoPage saldo={saldo} userId={session!.user.id} />}
+        {page === 'saldo'     && <SaldoPage saldo={saldo} userId={session!.user.id} onPaid={() => loadMine(session!.user.id)} />}
         {page === 'checkout'  && <CheckoutPage cart={cart} saldo={saldo} profile={profile} onBack={() => navigate('produk')}
           onBoughtWithSaldo={handleCheckoutDone} onGoTopUp={() => navigate('saldo')} />}
         {page === 'profile'   && <ProfilePage user={session!.user} isAdmin={isAdmin} profile={profile} onSaved={patch => setProfile(pr => ({ ...(pr ?? {}), ...patch }))} />}

@@ -1,5 +1,13 @@
 # Ringkasan Perubahan
 
+## v16: Top up otomatis Betabotz Paygate (terbaru)
+
+- **Database:** jalankan `supabase/migration_v16.sql` (setelah v15) **bersamaan dengan deploy kode**. Menambah kolom gateway di `topups`, RPC `create_gateway_topup` & `settle_gateway_topup` (hanya `service_role`), dan `cancel_topup` tidak lagi boleh membatalkan top up gateway.
+- **Backend (`api/`):** `_betabotz.js` (klien, API key hanya dari env), `_btzLogic.js` + `_btzSync.js` (verifikasi & sinkron, bisa dites), `btz-create-topup`, `btz-callback` (webhook), `btz-status` (fallback), `btz-cancel`.
+- **Frontend:** halaman Saldo punya tombol **Bayar via QRIS (otomatis)** + kartu menunggu pembayaran (QR, buka halaman bayar, cek status, batalkan, polling 5 dtk). Top up manual lama tetap ada.
+- **Env baru:** `BETABOTZ_API_KEY`, `BETABOTZ_WEBHOOK_SECRET`, `SITE_URL` (lihat `.env.example`). Panduan lengkap: `BETABOTZ.md`.
+- **Tes:** `pnpm test` kini menjalankan juga `api/btz.test.js`.
+
 ## v15: Bot WhatsApp di Admin (terbaru)
 
 - **Database:** jalankan `supabase/migration_v15.sql` (setelah v14). Tabel `wa_bot` (status, QR, kode pairing, heartbeat) dan `wa_bot_commands`; RPC `admin_wa_bot_command`, `admin_wa_test`, `admin_wa_stats`. Hanya admin yang bisa membaca QR/kode.

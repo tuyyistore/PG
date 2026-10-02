@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "format": "oxfmt",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/lib/*.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts api/*.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
