@@ -57,6 +57,7 @@ export async function createQris({ amount, orderRef, productName, customerName, 
   const body = {
     apikey: apiKey(),
     amount,
+    fee: 0, // tanpa fee tetap; kode unik hanya ditambah Betabotz bila ada transaksi pending dengan nominal sama
     timeout: timeoutMs,
     callback_url: callbackUrl,
     return_url: returnUrl,
