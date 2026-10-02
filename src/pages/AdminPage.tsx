@@ -65,14 +65,25 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const [saldoAmount, setSaldoAmount] = useState('')
   const [orderNotes, setOrderNotes] = useState<Record<number, string>>({})
   const [msgPrefill, setMsgPrefill] = useState<{ target: string; n: number } | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<Row | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelRefund, setCancelRefund] = useState(true)
+  const [cancelRestock, setCancelRestock] = useState(false)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelErr, setCancelErr] = useState('')
+  const [slaHours, setSlaHours] = useState(24) // 0 = penanda "terlambat" dimatikan
 
   const load = useCallback(async () => {
     try {
-      const [orders, products, topups, users, categories] = await Promise.all([
+      const [orders, products, topups, users, categories, settings] = await Promise.all([
         api('orders?select=*&order=id.desc&limit=1000'), api('products?select=*&order=sort,id'),
         api('topups?select=*&order=id.desc&limit=500'), api('profiles?select=*&order=created_at.desc&limit=1000'),
         api('categories?select=*&order=sort,id'),
+        api('app_settings?select=key,value').catch(() => [] as Row[]),
       ])
+      const rawSla = settings.find((x: Row) => x.key === 'pending_sla_hours')?.value
+      const sla = rawSla === undefined || rawSla === '' ? 24 : Number(rawSla)
+      setSlaHours(Number.isFinite(sla) && sla >= 0 ? sla : 24)
       setD({ orders, products, topups, users, categories }); setErr('')
     } catch (e) { setErr((e as Error).message) } finally { setLoaded(true) }
   }, [])
@@ -97,6 +108,24 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   }, [d.categories]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const orderCode = (o: Row) => String(o.order_code ?? `ORD-${o.id}`)
+  const isLate = (o: Row) => slaHours > 0 && o.status === 'pending' && Date.now() - new Date(o.created_at).getTime() > slaHours * 3600000
+  const lateCount = d.orders.filter(isLate).length
+  const openCancel = (o: Row) => {
+    setCancelTarget(o); setCancelReason(''); setCancelRefund(true)
+    setCancelRestock(o.status === 'pending') // pending = belum ada data terkirim, aman dikembalikan ke stok
+    setCancelErr('')
+  }
+  async function doCancel() {
+    if (!cancelTarget) return
+    const code = orderCode(cancelTarget)
+    setCancelBusy(true); setCancelErr('')
+    try {
+      await api('rpc/cancel_order', { method: 'POST', body: { p_order_id: cancelTarget.id, p_reason: cancelReason.trim() || null, p_refund: cancelRefund, p_restock: cancelRestock } })
+      setCancelTarget(null)
+      await load(); onChanged()
+      toast(`Pesanan ${code} dibatalkan`)
+    } catch (e) { setCancelErr((e as Error).message) } finally { setCancelBusy(false) }
+  }
   const copyOrderId = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code)
@@ -258,6 +287,12 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
 
       {loaded && tab === 'pesanan' && (
         <div className="space-y-4">
+          {lateCount > 0 && (
+            <div className="alert alert-warning">
+              <Icon name="clock" size={16} className="mt-0.5 flex-shrink-0" />
+              <span>{lateCount} pesanan pending sudah lebih dari {slaHours} jam. Segera proses atau batalkan &amp; refund.</span>
+            </div>
+          )}
           <div className="card p-4 sm:p-5 space-y-2">
             <Field label="Cari kode order (mis. ORD-K7M2QX9P), nama produk, atau email pembeli">
               <div className="relative">
@@ -288,7 +323,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-sm font-semibold text-white tabular whitespace-nowrap">{formatRp(o.price)}</p>
-                      <div className="mt-1"><StatusBadge status={o.status} /></div>
+                      <div className="mt-1 flex items-center justify-end gap-1.5">{isLate(o) && <span className="badge badge-warning">Terlambat</span>}<StatusBadge status={o.status} /></div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5">
@@ -300,6 +335,16 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                   {(o.buyer_whatsapp || o.buyer_contact_email) && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Icon name="mail" size={13} /> Kontak: {o.buyer_contact_email ?? '-'}{o.buyer_whatsapp ? ` · WA ${o.buyer_whatsapp}` : ''}</p>
                   )}
+                  {o.status === 'dibatalkan' ? (
+                    <div className="alert alert-warning">
+                      <Icon name="info" size={16} className="mt-0.5 flex-shrink-0" />
+                      <p className="text-[13px]">
+                        Dibatalkan{o.cancelled_at ? ` ${new Date(o.cancelled_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}.
+                        {' '}{Number(o.refunded_amount) > 0 ? `Refund ${formatRp(o.refunded_amount)}.` : 'Tanpa refund.'}
+                        {o.cancel_reason ? ` Alasan: ${o.cancel_reason}` : ''}
+                      </p>
+                    </div>
+                  ) : (<>
                   <Field label="Status">
                     <select value={o.status} onChange={e => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: { status: e.target.value } }))} className={FIELD} style={FIELD_STYLE}>
                       <option value="pending">Menunggu konfirmasi</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option>
@@ -309,9 +354,11 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
                     <textarea className="input" rows={2} placeholder="mis. IP: 1.2.3.4, user: root, pass: ****"
                       value={orderNotes[o.id] ?? o.account_data ?? ''} onChange={e => setOrderNotes(prev => ({ ...prev, [o.id]: e.target.value }))} />
                   </Field>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    <Btn onClick={() => openCancel(o)} variant="danger"><Icon name="x" size={14} /> Batalkan &amp; Refund</Btn>
                     <Btn onClick={() => saveAccountData(o)} variant="primary"><Icon name="check" size={14} /> Simpan Data Akun</Btn>
                   </div>
+                  </>)}
                 </div>
               ))}
             </div>
@@ -526,6 +573,29 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
             </div>
           )}
           <button onClick={() => messageUser(detailUser)} className="btn btn-secondary w-full"><Icon name="send" size={15} /> Kirim Pesan ke Pengguna Ini</button>
+        </Modal>
+      )}
+
+      {cancelTarget && (
+        <Modal title={`Batalkan ${orderCode(cancelTarget)}`} onClose={() => { if (!cancelBusy) setCancelTarget(null) }}>
+          <p className="text-[13px] text-slate-300">{cancelTarget.product_name} · {formatRp(cancelTarget.price)} · {who(cancelTarget.user_id)}</p>
+          {cancelErr && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{cancelErr}</span></div>}
+          <Field label="Alasan (dikirim ke pembeli lewat notifikasi & WhatsApp)">
+            <textarea className="input" rows={2} value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="mis. Stok kosong dari supplier" />
+          </Field>
+          <label className="flex items-start gap-2 text-[13px] text-slate-200">
+            <input type="checkbox" className="mt-0.5" checked={cancelRefund} onChange={e => setCancelRefund(e.target.checked)} />
+            <span>Kembalikan {formatRp(cancelTarget.price)} ke saldo pembeli</span>
+          </label>
+          <label className="flex items-start gap-2 text-[13px] text-slate-200">
+            <input type="checkbox" className="mt-0.5" checked={cancelRestock} onChange={e => setCancelRestock(e.target.checked)} />
+            <span>Kembalikan stok produk. Untuk produk kirim otomatis, data akun masuk lagi ke daftar stok. Jangan dicentang kalau pembeli sudah memakainya.</span>
+          </label>
+          <p className="hint">Tindakan ini tidak bisa dibatalkan. Voucher yang dipakai ikut dikembalikan bila semua pesanan dari pembelian itu dibatalkan.</p>
+          <div className="flex justify-end gap-2">
+            <Btn onClick={() => setCancelTarget(null)} variant="secondary" disabled={cancelBusy}>Tutup</Btn>
+            <Btn onClick={doCancel} variant="danger" disabled={cancelBusy}>{cancelBusy ? 'Memproses...' : 'Batalkan pesanan'}</Btn>
+          </div>
         </Modal>
       )}
     </div>

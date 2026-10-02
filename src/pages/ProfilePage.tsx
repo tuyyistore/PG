@@ -6,7 +6,8 @@ import { Avatar } from '../components/Brand'
 
 // ─── Profile Page ─────────────────────────────────────────────────────────────
 
-export const MAX_AVATAR_MB = 10
+export const MAX_AVATAR_MB = 2
+const AVATAR_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
 
 export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: SessionUser; isAdmin: boolean; profile: Row | null; onSaved: (patch: Row) => void }) {
   const [name, setName] = useState(profile?.full_name ?? displayName(user))
@@ -53,10 +54,11 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
   }
 
   async function pickAvatar(file: File) {
+    const ext = AVATAR_TYPES[file.type]
+    if (!ext) { setErr('Format foto harus JPG, PNG, WebP, atau GIF'); return }
     if (file.size > MAX_AVATAR_MB * 1024 * 1024) { setErr(`Ukuran foto maksimal ${MAX_AVATAR_MB} MB`); return }
     setUploading(true); setErr('')
     try {
-      const ext = file.name.split('.').pop() || 'jpg'
       const url = await uploadFile('avatars', `${user.id}/${Date.now()}.${ext}`, file)
       setAvatarUrl(url)
     } catch (e) { setErr('Gagal unggah foto: ' + (e as Error).message) } finally { setUploading(false) }
@@ -84,10 +86,10 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
               {isAdmin && <span className="badge badge-primary"><Icon name="shield" size={12} /> Admin</span>}
             </div>
             <p className="text-[13px] text-muted-foreground truncate">{user.email}</p>
-            <p className="hint mt-1">JPG, PNG atau GIF. Maksimal {MAX_AVATAR_MB} MB.</p>
+            <p className="hint mt-1">JPG, PNG, WebP atau GIF. Maksimal {MAX_AVATAR_MB} MB.</p>
           </div>
           <label className={`btn btn-secondary cursor-pointer self-start sm:self-center ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
-            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && pickAvatar(e.target.files[0])} />
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={e => e.target.files?.[0] && pickAvatar(e.target.files[0])} />
             {uploading ? <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Icon name="upload" size={16} />}
             {uploading ? 'Mengunggah...' : 'Ganti Foto Profil'}
           </label>

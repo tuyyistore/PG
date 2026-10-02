@@ -12,7 +12,7 @@ import iconCancel from '../assets/icons/status-cancel.svg'
 export function DashboardPage({ orders, saldo, onNav, onDetail, loading, onRefresh }: { orders: Order[]; saldo: number; onNav: (p: string) => void; onDetail: (o: Order) => void; loading?: boolean; onRefresh?: () => Promise<void> | void }) {
   const dibeli = orders.filter(o => o.status === 'aktif').length
   const pendingOrders = orders.filter(o => o.status === 'pending').length
-  const dibatalkan = orders.filter(o => o.status === 'nonaktif').length
+  const dibatalkan = orders.filter(o => o.status === 'nonaktif' || o.status === 'dibatalkan').length
   const [saldoHidden, setSaldoHidden] = useState(false)
   const body = (
     <div className="space-y-6">

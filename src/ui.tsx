@@ -144,6 +144,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   aktif: { label: 'Aktif', cls: 'badge-success' },
   pending: { label: 'Pending', cls: 'badge-warning' },
   nonaktif: { label: 'Nonaktif', cls: 'badge-danger' },
+  dibatalkan: { label: 'Dibatalkan', cls: 'badge-danger' },
   paid: { label: 'Dibayar', cls: 'badge-success' },
   approved: { label: 'Disetujui', cls: 'badge-success' },
   rejected: { label: 'Ditolak', cls: 'badge-danger' },

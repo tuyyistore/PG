@@ -108,8 +108,8 @@ export function Header({ onMenuOpen, onProfileClick, showDropdown, onProfileActi
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 lg:left-64 z-20 h-16 flex items-center px-4 sm:px-6 lg:px-8 justify-between bg-background/85 backdrop-blur-md"
-      style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+      className="fixed top-0 left-0 right-0 lg:left-64 z-20 h-16 flex items-center px-4 sm:px-6 lg:px-8 justify-between bg-background/85 backdrop-blur-md rounded-b-[16px]"
+      style={{ boxShadow: '0 1px 0 rgba(255,255,255,0.08), 0 10px 30px rgba(0,0,0,0.35)' }}
     >
       <div className="flex items-center gap-3 min-w-0">
         <button onClick={onMenuOpen} className="btn btn-ghost btn-icon -ml-2 lg:hidden" aria-label="Buka menu">

@@ -8,7 +8,7 @@ export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Produ
   const soldOut = p.available != null && p.available <= 0
   return (
     <div
-      className="card card-interactive overflow-hidden relative"
+      className="card card-float card-interactive overflow-hidden relative"
       style={p.popular ? { borderColor: 'rgba(79,124,255,0.35)', backgroundImage: 'linear-gradient(180deg, rgba(79,124,255,0.06) 0%, rgba(79,124,255,0) 60%)' } : undefined}
     >
       {p.popular && (
@@ -37,9 +37,10 @@ export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Produ
         <Icon name="chevronDown" size={16} className={`text-muted-foreground transition-transform duration-200 hidden sm:block ${expanded ? 'rotate-180' : ''}`} />
       </button>
 
+      {expanded && <div className="ticket-divider" />}
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
         <div className="overflow-hidden">
-          <div className="px-4 sm:px-5 pb-5 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-4 sm:px-5 pb-5 pt-4">
             {p.features.length > 0 && (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4 mb-4">
                 {p.features.map(f => (
@@ -57,7 +58,7 @@ export function ProductCard({ p, onAdd, inCart, expanded, onToggle }: { p: Produ
             <button
               onClick={onAdd}
               disabled={inCart || soldOut}
-              className={`btn btn-block ${inCart || soldOut ? '' : 'btn-primary'}`}
+              className={`btn btn-block ${inCart || soldOut ? '' : 'btn-primary btn-float'}`}
               style={inCart ? { background: 'rgba(34,197,94,0.1)', color: '#4ade80', borderColor: 'rgba(34,197,94,0.2)', opacity: 1, cursor: 'default' } : undefined}
             >
               {inCart ? <><Icon name="check" size={16} strokeWidth={2.25} /> Ditambahkan</> : soldOut ? 'Stok habis' : <><Icon name="cart" size={16} /> Tambah ke Keranjang</>}

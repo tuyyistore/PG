@@ -17,4 +17,6 @@ export const rowToOrder = (r: Row): Order => ({
   createdAt: r.created_at,
   date: new Date(r.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }),
   accountData: r.account_data ?? undefined,
+  cancelReason: r.cancel_reason ?? undefined,
+  refundedAmount: r.refunded_amount ? Number(r.refunded_amount) : undefined,
 })

@@ -1,5 +1,15 @@
 # Ringkasan Perubahan
 
+## Review v13: keamanan toko, pembatalan + refund, SLA pending (terbaru)
+
+- **Database:** jalankan `supabase/migration_v13.sql` (setelah v12) **bersamaan dengan deploy kode terbaru**. `buy_with_saldo` kini mengembalikan array kosong (bukan error) saat voucher gagal, dan ada status pesanan baru `dibatalkan`.
+- **Storage:** foto profil hanya bisa ditulis di folder `<user_id>/` milik sendiri (sebelumnya user mana pun bisa menimpa foto user lain). Bucket dibatasi ke JPG/PNG/WebP/GIF (SVG/HTML ditolak), foto profil maks 2 MB.
+- **Voucher:** percobaan gagal dibatasi 10 kali per 10 menit per user (`check_voucher` dan `buy_with_saldo`). Voucher yang gagal saat bayar tidak lagi membuat error, klien melepas voucher dan menampilkan pesan.
+- **Referral:** bonus hanya cair bila belanja bersih (setelah voucher) minimal Rp 10.000 (`ref_min` di `buy_with_saldo`). Voucher 100% tidak lagi memicu bonus. Bonus belum ditarik kembali bila pesanan dibatalkan.
+- **Batalkan & refund:** Admin → Pesanan → tombol **Batalkan & Refund** memanggil `cancel_order`: saldo dikembalikan, stok dikembalikan (opsional), voucher dikembalikan bila semua pesanan dari pembelian itu dibatalkan, pembeli dapat notifikasi + WhatsApp. Status `dibatalkan` tidak bisa diubah lewat dropdown (dijaga trigger) dan tidak bisa dihidupkan lagi (cegah refund ganda). Pesanan dibatalkan tidak masuk grafik pengeluaran user.
+- **SLA pending:** Admin → Pengaturan punya dua angka jam: batas "terlambat" (default 24) dan auto-refund (default 0 = mati). Pesanan terlambat diberi penanda di Admin → Pesanan. Pengingat WA ke admin dan auto-refund dijalankan `process_stale_pending_orders()`; jadwalkan lewat pg_cron (contoh di akhir migration) atau jalankan manual di SQL Editor.
+- **Catatan:** `.env` berisi kunci sungguhan ikut terkirim di zip sebelumnya. Rotate `SUPABASE_SERVICE_ROLE_KEY` dan token GoPay, dan jangan sertakan `.env` saat membagikan proyek.
+
 ## Review besar v12 (terbaru)
 
 - **Database:** jalankan `supabase/migration_v12.sql` (setelah v11) **bersamaan dengan deploy kode terbaru**. `buy_with_saldo` berganti signature (ada parameter voucher), jadi kode lama tidak cocok dengan DB baru dan sebaliknya.

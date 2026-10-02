@@ -6,7 +6,7 @@ import { OrderRow } from '../components/Orders'
 // ─── Pesanan Page ─────────────────────────────────────────────────────────────
 
 export const ORDER_FILTERS: { id: 'semua' | Order['status']; label: string }[] = [
-  { id: 'semua', label: 'Semua' }, { id: 'aktif', label: 'Aktif' }, { id: 'pending', label: 'Pending' }, { id: 'nonaktif', label: 'Nonaktif' },
+  { id: 'semua', label: 'Semua' }, { id: 'aktif', label: 'Aktif' }, { id: 'pending', label: 'Pending' }, { id: 'nonaktif', label: 'Nonaktif' }, { id: 'dibatalkan', label: 'Dibatalkan' },
 ]
 
 export function PesananPage({ orders, onDetail, loading, onRefresh }: { orders: Order[]; onDetail: (o: Order) => void; loading?: boolean; onRefresh?: () => Promise<void> | void }) {

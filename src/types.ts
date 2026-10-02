@@ -25,9 +25,12 @@ export interface CartItem { product: Product; qty: number }
 export interface Order {
   id: string
   product: Product
-  status: 'aktif' | 'nonaktif' | 'pending'
+  status: 'aktif' | 'nonaktif' | 'pending' | 'dibatalkan'
   date: string
   /** Tanggal asli (ISO) — dipakai grafik pengeluaran. */
   createdAt: string
   accountData?: string
+  /** Diisi saat pesanan dibatalkan admin (atau otomatis karena terlambat). */
+  cancelReason?: string
+  refundedAmount?: number
 }

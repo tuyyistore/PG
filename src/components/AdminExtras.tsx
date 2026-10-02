@@ -198,12 +198,17 @@ export function AdminSettings() {
   const { data, err, reload } = useLoad(() => api('app_settings?select=key,value'))
   const [payInfo, setPayInfo] = useState<string | null>(null)
   const [adminWa, setAdminWa] = useState<string | null>(null)
+  const [slaHrs, setSlaHrs] = useState<string | null>(null)
+  const [autoHrs, setAutoHrs] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
   const cur = (k: string) => data?.find(r => r.key === k)?.value ?? ''
   const pay = payInfo ?? cur('pay_info')
   const wa = adminWa ?? cur('admin_wa')
+  const sla = slaHrs ?? cur('pending_sla_hours')
+  const auto = autoHrs ?? cur('pending_autorefund_hours')
+  const hours = (v: string) => String(Math.max(0, Math.floor(Number(v.replace(/\D/g, '')) || 0)))
 
   async function save() {
     setSaving(true); setMsg('')
@@ -211,8 +216,10 @@ export function AdminSettings() {
       await Promise.all([
         api('app_settings?key=eq.pay_info', { method: 'PATCH', body: { value: pay } }),
         api('app_settings?key=eq.admin_wa', { method: 'PATCH', body: { value: wa.trim() } }),
+        api('app_settings?key=eq.pending_sla_hours', { method: 'PATCH', body: { value: hours(sla) } }),
+        api('app_settings?key=eq.pending_autorefund_hours', { method: 'PATCH', body: { value: hours(auto) } }),
       ])
-      toast('Pengaturan disimpan'); setPayInfo(null); setAdminWa(null); reload()
+      toast('Pengaturan disimpan'); setPayInfo(null); setAdminWa(null); setSlaHrs(null); setAutoHrs(null); reload()
     } catch (e) { setMsg((e as Error).message) } finally { setSaving(false) }
   }
 
@@ -226,6 +233,15 @@ export function AdminSettings() {
         <Field label="Nomor WhatsApp admin untuk notifikasi pesanan baru (opsional, mis. 6281234567890)">
           <input className={FIELD} inputMode="tel" value={wa} onChange={e => setAdminWa(e.target.value)} />
         </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Pesanan pending dianggap terlambat setelah (jam, 0 = mati)">
+            <input className={FIELD} inputMode="numeric" value={sla} onChange={e => setSlaHrs(e.target.value)} />
+          </Field>
+          <Field label="Batalkan + refund otomatis setelah (jam, 0 = mati)">
+            <input className={FIELD} inputMode="numeric" value={auto} onChange={e => setAutoHrs(e.target.value)} />
+          </Field>
+        </div>
+        <p className="hint">Pengingat ke WhatsApp admin dan auto-refund berjalan lewat jadwal pg_cron (lihat akhir migration_v13.sql).</p>
         <div className="flex justify-end"><button onClick={save} disabled={saving || !data} className="btn btn-sm btn-primary"><Icon name="check" size={14} strokeWidth={2.25} /> Simpan</button></div>
       </div>
     </div>

@@ -66,17 +66,32 @@ export function OrderDetailModal({ order, onClose }: { order: Order; onClose: ()
           <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm flex-shrink-0" aria-label="Tutup"><Icon name="x" size={18} /></button>
         </div>
         <div className="p-5">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <p className="label !mb-0">Data akun / informasi penting</p>
-            {order.accountData && <CopyCodeButton code={order.accountData} label="Data akun" />}
-          </div>
-          <div className="card-inset p-4">
-            {order.accountData ? (
-              <p className="text-[13px] text-slate-100 whitespace-pre-wrap leading-relaxed font-mono break-words">{order.accountData}</p>
-            ) : (
-              <p className="hint">Belum ada data yang dikirim admin untuk pesanan ini. Silakan hubungi support jika perlu.</p>
-            )}
-          </div>
+          {order.status === 'dibatalkan' ? (
+            <div className="alert alert-warning">
+              <Icon name="info" size={16} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-white">Pesanan dibatalkan</p>
+                <p className="text-[13px] opacity-90">
+                  {order.refundedAmount ? `Saldo ${formatRp(order.refundedAmount)} sudah dikembalikan ke akunmu. ` : ''}
+                  {order.cancelReason ? `Alasan: ${order.cancelReason}` : ''}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="label !mb-0">Data akun / informasi penting</p>
+                {order.accountData && <CopyCodeButton code={order.accountData} label="Data akun" />}
+              </div>
+              <div className="card-inset p-4">
+                {order.accountData ? (
+                  <p className="text-[13px] text-slate-100 whitespace-pre-wrap leading-relaxed font-mono break-words">{order.accountData}</p>
+                ) : (
+                  <p className="hint">Belum ada data yang dikirim admin untuk pesanan ini. Silakan hubungi support jika perlu.</p>
+                )}
+              </div>
+            </>
+          )}
           <button type="button" onClick={() => printReceipt(order)} className="btn btn-secondary btn-sm mt-3"><Icon name="clipboard" size={14} /> Cetak / Unduh Struk</button>
           <p className="text-xs text-muted-foreground mt-3">
             Butuh bantuan aktivasi akun/data?{' '}

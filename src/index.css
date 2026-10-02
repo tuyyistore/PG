@@ -124,6 +124,7 @@ body {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   }
   .card-inset {
     background: var(--surface);
@@ -136,6 +137,37 @@ body {
   .card-interactive:hover {
     border-color: rgba(255, 255, 255, 0.12);
   }
+
+  /* Efek melayang (drop shadow) */
+  .card-float {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+  .btn-float {
+    box-shadow: 0 8px 24px rgba(79, 124, 255, 0.35);
+  }
+
+  /* Garis putus-putus + lekukan kiri-kanan ala tiket (ticket cutout).
+     Wajib di dalam elemen yang punya overflow-hidden dan relative. */
+  .ticket-divider {
+    position: relative;
+    height: 2px;
+    margin: 0 18px;
+    background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px);
+  }
+  .ticket-divider::before,
+  .ticket-divider::after {
+    content: '';
+    position: absolute;
+    top: -9px;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--ticket-notch, var(--background));
+    border: 1px solid var(--border);
+  }
+  .ticket-on-card { --ticket-notch: var(--card); }
+  .ticket-divider::before { left: -28px; }
+  .ticket-divider::after { right: -28px; }
 
   /* Typography helpers */
   .page-title {
@@ -495,6 +527,9 @@ body {
   .divider {
     height: 1px;
     background: var(--border);
+  }
+  .divider-dashed {
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 6px, transparent 6px 12px);
   }
 
   /* Modal */

@@ -9,6 +9,7 @@ export function SpendingChart({ orders, loading }: { orders: Order[]; loading?: 
     return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('id-ID', { month: 'short' }), total: 0, count: 0 }
   })
   for (const o of orders) {
+    if (o.status === 'dibatalkan') continue // sudah di-refund, bukan pengeluaran
     const d = new Date(o.createdAt)
     const m = months.find(x => x.key === `${d.getFullYear()}-${d.getMonth()}`)
     if (m) { m.total += o.product.price; m.count++ }
