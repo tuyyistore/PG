@@ -1,6 +1,10 @@
 # Ringkasan Perubahan
 
-## v16: Top up otomatis Betabotz Paygate (terbaru)
+## v17: Top up manual dihapus, QR tampil di website (terbaru)
+
+- Jalankan `supabase/migration_v17.sql` (cabut `request_topup`). Halaman Saldo hanya **Bayar via QRIS**; QR dibuat di browser dari `qrisString` (paket `qrcode`). Server mengambil `qrisString` dari detail transaksi bila kosong saat create.
+
+## v16: Top up otomatis Betabotz Paygate
 
 - **Database:** jalankan `supabase/migration_v16.sql` (setelah v15) **bersamaan dengan deploy kode**. Menambah kolom gateway di `topups`, RPC `create_gateway_topup` & `settle_gateway_topup` (hanya `service_role`), dan `cancel_topup` tidak lagi boleh membatalkan top up gateway.
 - **Backend (`api/`):** `_betabotz.js` (klien, API key hanya dari env), `_btzLogic.js` + `_btzSync.js` (verifikasi & sinkron, bisa dites), `btz-create-topup`, `btz-callback` (webhook), `btz-status` (fallback), `btz-cancel`.

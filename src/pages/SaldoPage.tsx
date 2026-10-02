@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import { api, apiFn, type Row } from '../lib/supabase'
 import waLogo from '../assets/brand/whatsapp.webp'
 import { openLiveChat } from '../components/Layout'
@@ -11,17 +12,25 @@ const PRESETS = [10000, 25000, 50000, 100000]
 
 const toWaDigits = (v: string) => { const d = v.replace(/\D/g, ''); return d.startsWith('0') ? '62' + d.slice(1) : d }
 
+function QrBox({ value }: { value: string }) {
+  const [src, setSrc] = useState('')
+  useEffect(() => {
+    let alive = true
+    QRCode.toDataURL(value, { width: 300, margin: 2, errorCorrectionLevel: 'M' }).then(u => { if (alive) setSrc(u) }).catch(() => { if (alive) setSrc('') })
+    return () => { alive = false }
+  }, [value])
+  if (!src) return <div className="skeleton mx-auto" style={{ width: 220, height: 220, borderRadius: 12 }} />
+  return <div className="flex justify-center"><img src={src} alt="QRIS" width={220} height={220} className="rounded-lg bg-white p-2" /></div>
+}
+
 export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: string; onPaid?: () => void }) {
   const [history, setHistory] = useState<Row[] | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [amount, setAmount] = useState('')
-  const [creating, setCreating] = useState(false)
   const [gwCreating, setGwCreating] = useState(false)
   const [gwBusyId, setGwBusyId] = useState<number | null>(null)
   const [err, setErr] = useState('')
-  const [payInfo, setPayInfo] = useState('')
   const [waNumber, setWaNumber] = useState(WA_FALLBACK)
-  const [expireHours, setExpireHours] = useState(0)
   const toast = useToast()
   const waUrl = (text: string) => `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`
 
@@ -36,37 +45,13 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
   useEffect(() => {
     api('rpc/get_public_settings', { method: 'POST', body: {} })
       .then(rows => {
-        const get = (k: string) => rows.find((r: Row) => r.key === k)?.value ?? ''
-        setPayInfo(get('pay_info'))
-        const wa = toWaDigits(String(get('admin_wa')))
+        const wa = toWaDigits(String(rows.find((r: Row) => r.key === 'admin_wa')?.value ?? ''))
         if (wa.length >= 9) setWaNumber(wa)
-        const hrs = Number(get('topup_expire_hours'))
-        setExpireHours(Number.isFinite(hrs) && hrs > 0 ? hrs : 0)
       })
       .catch(() => {})
   }, [])
 
   const nominal = Number(amount.replace(/\D/g, ''))
-
-  async function createRequest() {
-    setCreating(true); setErr('')
-    try {
-      await api('rpc/request_topup', { method: 'POST', body: { p_amount: nominal } })
-      setAmount('')
-      toast('Permintaan top up dibuat. Transfer sesuai nominal lalu konfirmasi ke admin.')
-      await loadHistory()
-    } catch (e) { setErr((e as Error).message) } finally { setCreating(false) }
-  }
-
-  const pending = (history ?? []).filter(t => t.status === 'pending' && t.unique_code)
-
-  async function cancelRequest(id: number) {
-    try {
-      await api('rpc/cancel_topup', { method: 'POST', body: { p_id: id } })
-      toast('Permintaan top up dibatalkan')
-      await loadHistory()
-    } catch (e) { setErr((e as Error).message) }
-  }
 
   // ── Top up otomatis via Betabotz Paygate (QRIS). Webhook = jalur utama, polling status = cadangan. ──
   const gwPending = (history ?? []).filter(t => t.status === 'pending' && t.gateway === 'betabotz')
@@ -127,14 +112,10 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
           </div>
         </div>
         {err && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{err}</span></div>}
-        <button type="button" onClick={createGateway} disabled={gwCreating || creating || nominal < 1000} className="btn btn-primary btn-lg btn-block">
-          {gwCreating ? 'Membuat QRIS...' : <><Icon name="card" size={18} /> Bayar via QRIS (otomatis)</>}
+        <button type="button" onClick={createGateway} disabled={gwCreating || nominal < 1000} className="btn btn-primary btn-lg btn-block">
+          {gwCreating ? 'Membuat QRIS...' : <><Icon name="card" size={18} /> Bayar via QRIS</>}
         </button>
-        <p className="hint">Scan QRIS lalu bayar sesuai nominal yang tampil (ada tambahan kode unik kecil). Saldo masuk otomatis setelah pembayaran terdeteksi.</p>
-        <button type="button" onClick={createRequest} disabled={creating || gwCreating || nominal < 1000} className="btn btn-secondary btn-block">
-          {creating ? 'Membuat...' : 'Top up manual (konfirmasi admin)'}
-        </button>
-        <p className="hint">Top up manual: permintaan mendapat kode unik 1–99 yang ditambahkan ke nominal transfer, saldo masuk setelah admin memverifikasi.{expireHours > 0 ? ` Permintaan yang belum dibayar kedaluwarsa dalam ${expireHours} jam.` : ''}</p>
+        <p className="hint">Scan QRIS lalu bayar sesuai nominal yang tampil. Saldo masuk otomatis setelah pembayaran terdeteksi.</p>
       </div>
 
       {gwPending.length > 0 && (
@@ -158,15 +139,9 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
                     </p>
                   )}
                 </div>
-                {t.qris_string && (
-                  <div className="flex justify-center">
-                    <img
-                      src={`https://web.btzpay.my.id/api/qris/create-qr-code?data=${encodeURIComponent(t.qris_string)}&size=300x300&style=3&format=png&pngMode=native&viewer=0`}
-                      alt="QRIS" width={220} height={220} className="rounded-lg bg-white p-2"
-                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                    />
-                  </div>
-                )}
+                {t.qris_string
+                  ? <QrBox value={t.qris_string} />
+                  : <p className="text-xs text-muted-foreground text-center">QR belum tersedia di sini. Buka halaman pembayaran di bawah.</p>}
                 {t.payment_url && (
                   <a href={t.payment_url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-block">
                     <Icon name="card" size={18} /> Buka halaman pembayaran
@@ -176,37 +151,6 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
                   {busy ? 'Memeriksa...' : 'Saya sudah bayar — cek status'}
                 </button>
                 <button type="button" onClick={() => cancelGateway(t.id)} disabled={busy} className="btn btn-ghost btn-block">Batalkan pembayaran ini</button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {pending.length > 0 && (
-        <div className="space-y-3">
-          {pending.map(t => {
-            const total = Number(t.amount) + Number(t.unique_code)
-            return (
-              <div key={t.id} className="card p-5 sm:p-6 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="section-title">Menunggu pembayaran</h2>
-                  <StatusBadge status={t.status} />
-                </div>
-                <div className="card-inset p-4">
-                  <p className="text-xs text-muted-foreground">Transfer tepat sebesar</p>
-                  <p className="text-2xl font-semibold text-white tracking-tight tabular mt-0.5">{formatRp(total)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Saldo yang masuk: {formatRp(t.amount)}</p>
-                  {expireHours > 0 && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Berlaku sampai {new Date(new Date(t.created_at).getTime() + expireHours * 3600000).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  )}
-                </div>
-                {payInfo && <p className="text-[13px] text-slate-200 whitespace-pre-wrap">{payInfo}</p>}
-                <a href={waUrl(`Halo admin, saya sudah transfer ${formatRp(total)} untuk top up #${t.id} di Tuyyi Store.`)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-block">
-                  <img src={waLogo} alt="" width={20} height={20} className="flex-shrink-0" /> Konfirmasi via WhatsApp
-                </a>
-                <button type="button" onClick={() => cancelRequest(t.id)} className="btn btn-ghost btn-block">Batalkan permintaan ini</button>
               </div>
             )
           })}

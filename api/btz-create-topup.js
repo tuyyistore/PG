@@ -1,7 +1,7 @@
 // POST { amount } → membuat top up QRIS Betabotz untuk user yang login.
 import { requireUser } from './_auth.js'
 import { supabaseAdmin } from './_supabaseAdmin.js'
-import { createQris, cancelTransaction, isConfigured, baseUrl, log } from './_betabotz.js'
+import { createQris, getTransaction, cancelTransaction, isConfigured, baseUrl, log } from './_betabotz.js'
 import { topupRef, sanitizeTx, safePaymentUrl } from './_btzLogic.js'
 
 const siteUrl = (req) => (process.env.SITE_URL || `https://${req.headers['x-forwarded-host'] || req.headers.host}`).replace(/\/$/, '')
@@ -46,6 +46,13 @@ export default async function handler(req, res) {
     return res.status(502).json({ error: 'Gagal membuat pembayaran di Betabotz. Coba lagi sebentar.' })
   }
 
+  // Beberapa metode mengembalikan qrisString kosong saat create; coba ambil dari detail transaksi.
+  let qris = d.qrisString || ''
+  if (!qris) {
+    try { qris = (await getTransaction(d.transactionId, d.accessKey))?.qrisString || '' }
+    catch (e) { log('warn', 'qris_fetch_failed', { topupId, txId: d.transactionId, message: e.message }) }
+  }
+
   const paymentUrl = safePaymentUrl(d.paymentUrl, baseUrl())
   if (d.paymentUrl && !paymentUrl) log('warn', 'payment_url_rejected', { topupId, txId: d.transactionId })
 
@@ -53,7 +60,7 @@ export default async function handler(req, res) {
     btz_transaction_id: d.transactionId,
     btz_access_key: d.accessKey,
     payment_url: paymentUrl,
-    qris_string: d.qrisString || null,
+    qris_string: qris || null,
     total_amount: Number.isFinite(Number(d.totalAmount)) ? Number(d.totalAmount) : null,
     gateway_fee: Number.isFinite(Number(d.fee)) ? Number(d.fee) : null,
     expired_at: d.expiredAt && !Number.isNaN(Date.parse(d.expiredAt)) ? new Date(d.expiredAt).toISOString() : null,
@@ -68,5 +75,5 @@ export default async function handler(req, res) {
   }
 
   log('info', 'topup_created', { topupId, txId: d.transactionId })
-  return res.status(201).json({ id: topupId, paymentUrl, qrisString: d.qrisString || null, totalAmount: Number(d.totalAmount) || null, expiredAt: d.expiredAt || null })
+  return res.status(201).json({ id: topupId, paymentUrl, qrisString: qris || null, totalAmount: Number(d.totalAmount) || null, expiredAt: d.expiredAt || null })
 }
