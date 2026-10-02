@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { api, apiFn, type Row } from '../lib/supabase'
-import waLogo from '../assets/brand/whatsapp.webp'
-import { openLiveChat } from '../components/Layout'
+import { OtherPayMethods } from '../components/OtherPayMethods'
 import { Icon, formatRp, PageHeader, EmptyState, StatusBadge, SkeletonRows } from '../ui'
 import { useToast } from '../feedback'
 
-// Cadangan bila admin belum mengisi nomor WhatsApp di Admin → Pengaturan.
-const WA_FALLBACK = '6283121214520'
 const PRESETS = [10000, 25000, 50000, 100000]
-
-const toWaDigits = (v: string) => { const d = v.replace(/\D/g, ''); return d.startsWith('0') ? '62' + d.slice(1) : d }
 
 function QrBox({ value }: { value: string }) {
   const [src, setSrc] = useState('')
@@ -30,11 +25,9 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
   const [gwCreating, setGwCreating] = useState(false)
   const [gwBusyId, setGwBusyId] = useState<number | null>(null)
   const [err, setErr] = useState('')
-  const [waNumber, setWaNumber] = useState(WA_FALLBACK)
   const toast = useToast()
-  const waUrl = (text: string) => `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`
 
-  const loadHistory = () => api(`topups?select=id,amount,unique_code,status,created_at,gateway,payment_url,qris_string,total_amount,expired_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
+  const loadHistory = () => api(`topups?select=id,amount,unique_code,status,created_at,gateway,qris_string,total_amount,expired_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
   const refreshHistory = async () => {
     if (refreshing) return
     setRefreshing(true)
@@ -42,14 +35,6 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
     setRefreshing(false)
   }
   useEffect(() => { loadHistory() }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    api('rpc/get_public_settings', { method: 'POST', body: {} })
-      .then(rows => {
-        const wa = toWaDigits(String(rows.find((r: Row) => r.key === 'admin_wa')?.value ?? ''))
-        if (wa.length >= 9) setWaNumber(wa)
-      })
-      .catch(() => {})
-  }, [])
 
   const nominal = Number(amount.replace(/\D/g, ''))
 
@@ -141,12 +126,7 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
                 </div>
                 {t.qris_string
                   ? <QrBox value={t.qris_string} />
-                  : <p className="text-xs text-muted-foreground text-center">QR belum tersedia di sini. Buka halaman pembayaran di bawah.</p>}
-                {t.payment_url && (
-                  <a href={t.payment_url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-block">
-                    <Icon name="card" size={18} /> Buka halaman pembayaran
-                  </a>
-                )}
+                  : <p className="text-xs text-muted-foreground text-center">QR belum tersedia. Batalkan pembayaran ini lalu buat yang baru.</p>}
                 <button type="button" onClick={() => checkGateway(t.id)} disabled={busy} className="btn btn-primary btn-block">
                   {busy ? 'Memeriksa...' : 'Saya sudah bayar — cek status'}
                 </button>
@@ -157,14 +137,7 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <a href={waUrl('Halo admin, saya mau tambah saldo di Tuyyi Store.')} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
-          <img src={waLogo} alt="" width={20} height={20} className="flex-shrink-0" /> WhatsApp
-        </a>
-        <button type="button" onClick={openLiveChat} className="btn btn-primary">
-          <Icon name="headset" size={18} /> Chat Live
-        </button>
-      </div>
+      <OtherPayMethods />
 
       <div className="card overflow-hidden">
         <div className="px-4 sm:px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

@@ -7,10 +7,11 @@ import { AdminVouchers, AdminStock, AdminAudit, AdminSettings } from '../compone
 import { AdminOrders } from '../components/AdminOrders'
 import { AdminUsers } from '../components/AdminUsers'
 import { AdminTopups } from '../components/AdminTopups'
+import { AdminPayMethods } from '../components/AdminPayMethods'
 import { AdminBot } from '../components/AdminBot'
 import { Btn, Field, FIELD, FIELD_STYLE } from '../components/adminKit'
 
-const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna'], ['voucher', 'Voucher'], ['stok', 'Stok'], ['pesan', 'Pesan'], ['bot', 'Bot WA'], ['audit', 'Audit'], ['pengaturan', 'Pengaturan']] as const
+const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['metode', 'Metode Bayar'], ['pengguna', 'Pengguna'], ['voucher', 'Voucher'], ['stok', 'Stok'], ['pesan', 'Pesan'], ['bot', 'Bot WA'], ['audit', 'Audit'], ['pengaturan', 'Pengaturan']] as const
 const EMPTY = { name: '', category: '', tagline: '', price: '', original_price: '', period: '/bln', features: '', badge: '', popular: false, logo_url: '', auto_delivery: false, stock: '' }
 const MAX_LOGO_MB = 10
 
@@ -196,6 +197,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       {loaded && tab === 'pesanan' && <AdminOrders slaHours={slaHours} lateCount={stats?.late ?? 0} onChanged={refreshAll} />}
       {loaded && tab === 'pengguna' && <AdminUsers onChanged={refreshAll} onMessage={u => { setMsgPrefill({ target: u.user_code ?? u.email ?? '', n: Date.now() }); setTab('pesan') }} />}
       {loaded && tab === 'topup' && <AdminTopups onChanged={refreshAll} />}
+      {loaded && tab === 'metode' && <AdminPayMethods />}
 
       {loaded && tab === 'produk' && (
         <div className="space-y-4">
