@@ -149,6 +149,7 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   approved: { label: 'Disetujui', cls: 'badge-success' },
   rejected: { label: 'Ditolak', cls: 'badge-danger' },
   expired: { label: 'Kedaluwarsa', cls: 'badge-neutral' },
+  cancelled: { label: 'Dibatalkan', cls: 'badge-neutral' },
 }
 
 export function StatusBadge({ status }: { status: string }) {

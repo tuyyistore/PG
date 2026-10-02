@@ -5,10 +5,11 @@ import { openLiveChat } from '../components/Layout'
 import { Icon, formatRp, PageHeader, EmptyState, StatusBadge, SkeletonRows } from '../ui'
 import { useToast } from '../feedback'
 
-const WA_NUMBER = '6283121214520'
+// Cadangan bila admin belum mengisi nomor WhatsApp di Admin → Pengaturan.
+const WA_FALLBACK = '6283121214520'
 const PRESETS = [10000, 25000, 50000, 100000]
 
-const waUrl = (text: string) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`
+const toWaDigits = (v: string) => { const d = v.replace(/\D/g, ''); return d.startsWith('0') ? '62' + d.slice(1) : d }
 
 export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) {
   const [history, setHistory] = useState<Row[] | null>(null)
@@ -17,7 +18,10 @@ export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) 
   const [creating, setCreating] = useState(false)
   const [err, setErr] = useState('')
   const [payInfo, setPayInfo] = useState('')
+  const [waNumber, setWaNumber] = useState(WA_FALLBACK)
+  const [expireHours, setExpireHours] = useState(0)
   const toast = useToast()
+  const waUrl = (text: string) => `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`
 
   const loadHistory = () => api(`topups?select=id,amount,unique_code,status,created_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
   const refreshHistory = async () => {
@@ -29,7 +33,14 @@ export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) 
   useEffect(() => { loadHistory() }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     api('rpc/get_public_settings', { method: 'POST', body: {} })
-      .then(rows => setPayInfo(rows.find((r: Row) => r.key === 'pay_info')?.value ?? ''))
+      .then(rows => {
+        const get = (k: string) => rows.find((r: Row) => r.key === k)?.value ?? ''
+        setPayInfo(get('pay_info'))
+        const wa = toWaDigits(String(get('admin_wa')))
+        if (wa.length >= 9) setWaNumber(wa)
+        const hrs = Number(get('topup_expire_hours'))
+        setExpireHours(Number.isFinite(hrs) && hrs > 0 ? hrs : 0)
+      })
       .catch(() => {})
   }, [])
 
@@ -46,6 +57,14 @@ export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) 
   }
 
   const pending = (history ?? []).filter(t => t.status === 'pending' && t.unique_code)
+
+  async function cancelRequest(id: number) {
+    try {
+      await api('rpc/cancel_topup', { method: 'POST', body: { p_id: id } })
+      toast('Permintaan top up dibatalkan')
+      await loadHistory()
+    } catch (e) { setErr((e as Error).message) }
+  }
 
   return (
     <div className="space-y-6">
@@ -68,7 +87,7 @@ export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) 
         <button type="button" onClick={createRequest} disabled={creating || nominal < 1000} className="btn btn-primary btn-lg btn-block">
           {creating ? 'Membuat...' : <><Icon name="card" size={18} /> Buat Permintaan Top Up</>}
         </button>
-        <p className="hint">Setiap permintaan mendapat kode unik 1–99 yang ditambahkan ke nominal transfer supaya admin mudah mencocokkan. Saldo masuk setelah admin memverifikasi.</p>
+        <p className="hint">Setiap permintaan mendapat kode unik 1–99 yang ditambahkan ke nominal transfer supaya admin mudah mencocokkan. Saldo masuk setelah admin memverifikasi.{expireHours > 0 ? ` Permintaan yang belum dibayar kedaluwarsa dalam ${expireHours} jam.` : ''}</p>
       </div>
 
       {pending.length > 0 && (
@@ -85,11 +104,17 @@ export function SaldoPage({ saldo, userId }: { saldo: number; userId: string }) 
                   <p className="text-xs text-muted-foreground">Transfer tepat sebesar</p>
                   <p className="text-2xl font-semibold text-white tracking-tight tabular mt-0.5">{formatRp(total)}</p>
                   <p className="text-xs text-muted-foreground mt-1">Saldo yang masuk: {formatRp(t.amount)}</p>
+                  {expireHours > 0 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Berlaku sampai {new Date(new Date(t.created_at).getTime() + expireHours * 3600000).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
                 </div>
                 {payInfo && <p className="text-[13px] text-slate-200 whitespace-pre-wrap">{payInfo}</p>}
                 <a href={waUrl(`Halo admin, saya sudah transfer ${formatRp(total)} untuk top up #${t.id} di Tuyyi Store.`)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-block">
                   <img src={waLogo} alt="" width={20} height={20} className="flex-shrink-0" /> Konfirmasi via WhatsApp
                 </a>
+                <button type="button" onClick={() => cancelRequest(t.id)} className="btn btn-ghost btn-block">Batalkan permintaan ini</button>
               </div>
             )
           })}

@@ -175,6 +175,22 @@ export async function api<T = Row[]>(path: string, opt: { method?: string; body?
   return (txt ? JSON.parse(txt) : null) as T
 }
 
+/** GET berhalaman: mengembalikan baris + total (header Content-Range, via Prefer: count=exact). */
+export async function apiPage<T = Row>(path: string): Promise<{ rows: T[]; total: number }> {
+  if (current && current.expires_at - 60 < now()) await refresh(current)
+  const r = await fetch(`${BASE}/rest/v1/${path}`, {
+    headers: { apikey: KEY, Authorization: `Bearer ${current?.access_token ?? KEY}`, 'Content-Type': 'application/json', Prefer: 'count=exact' },
+  })
+  if (!r.ok) {
+    let m = r.statusText
+    try { m = (await r.json()).message ?? m } catch {}
+    throw new Error(m)
+  }
+  const rows = (await r.json()) as T[]
+  const total = Number((r.headers.get('content-range') ?? '').split('/')[1])
+  return { rows, total: Number.isFinite(total) ? total : rows.length }
+}
+
 /** Panggil endpoint serverless kita sendiri (folder /api), otomatis membawa Bearer token sesi. */
 export async function apiFn<T = any>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {
   if (current && current.expires_at - 60 < now()) await refresh(current)

@@ -80,6 +80,7 @@ export function CheckoutPage({ cart, saldo, profile, onBack, onBoughtWithSaldo, 
                 Data akun akan dikirim otomatis ke <span className="text-white font-medium">{profile?.contact_email || '-'}</span>
                 {profile?.whatsapp && <> &amp; WA <span className="text-white font-medium">{profile.whatsapp}</span></>}.
                 {' '}Bisa diubah di menu Pengaturan.
+                {profile?.whatsapp && !profile?.whatsapp_verified && <> Nomor WhatsApp belum diverifikasi, jadi notifikasi WA belum dikirim. Verifikasi di menu Pengaturan.</>}
               </p>
             </div>
           )}

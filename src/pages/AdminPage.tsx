@@ -1,93 +1,69 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, apiFn, uploadFile, type Row } from '../lib/supabase'
-import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, StatusBadge, SkeletonRows, type IconName } from '../ui'
+import { api, uploadFile, type Row } from '../lib/supabase'
+import { Icon, formatRp, ProductThumb, PageHeader, EmptyState, SkeletonRows, type IconName } from '../ui'
 import { useConfirm, useToast } from '../feedback'
 import { AdminMessages } from '../components/AdminMessages'
 import { AdminVouchers, AdminStock, AdminAudit, AdminSettings } from '../components/AdminExtras'
-import { rowHandle } from '../lib/notifications'
+import { AdminOrders } from '../components/AdminOrders'
+import { AdminUsers } from '../components/AdminUsers'
+import { AdminTopups } from '../components/AdminTopups'
+import { AdminBot } from '../components/AdminBot'
+import { Btn, Field, FIELD, FIELD_STYLE } from '../components/adminKit'
 
-const MUTED = { color: '#94a3b8' }
-const FIELD = 'input input-sm'
-const FIELD_STYLE = {} as React.CSSProperties
-const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna'], ['voucher', 'Voucher'], ['stok', 'Stok'], ['pesan', 'Pesan'], ['audit', 'Audit'], ['pengaturan', 'Pengaturan']] as const
+const TABS = [['ringkasan', 'Ringkasan'], ['pesanan', 'Pesanan'], ['produk', 'Produk'], ['topup', 'Top Up'], ['pengguna', 'Pengguna'], ['voucher', 'Voucher'], ['stok', 'Stok'], ['pesan', 'Pesan'], ['bot', 'Bot WA'], ['audit', 'Audit'], ['pengaturan', 'Pengaturan']] as const
 const EMPTY = { name: '', category: '', tagline: '', price: '', original_price: '', period: '/bln', features: '', badge: '', popular: false, logo_url: '', auto_delivery: false, stock: '' }
 const MAX_LOGO_MB = 10
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="text-[12px] font-medium text-slate-300 mb-1.5 block">{label}</span>{children}</label>
-}
-
-type BtnVariant = 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'ghost'
-
-// `color` dipertahankan untuk kompatibilitas; dipetakan ke varian tombol netral.
-const COLOR_VARIANT: Record<string, BtnVariant> = {
-  '#3d7ef5': 'primary', '#2657c9': 'secondary', '#15803d': 'success', '#b91c1c': 'danger', '#b45309': 'warning', '#4b5378': 'ghost',
-}
-
-function Btn({ children, onClick, color = '#3d7ef5', variant, disabled }: { children: React.ReactNode; onClick: () => void; color?: string; variant?: BtnVariant; disabled?: boolean }) {
-  const v = variant ?? COLOR_VARIANT[color] ?? 'primary'
-  const cls = v === 'ghost' ? 'btn-secondary' : `btn-${v}`
-  return (
-    <button onClick={onClick} disabled={disabled} className={`btn btn-sm ${cls}`}>
-      {children}
-    </button>
-  )
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="overlay" onClick={onClose}>
-      <div className="dialog" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <button onClick={onClose} className="btn btn-ghost btn-icon btn-sm" aria-label="Tutup"><Icon name="x" size={18} /></button>
-        </div>
-        <div className="p-5 space-y-4">{children}</div>
-      </div>
-    </div>
-  )
+type Stats = {
+  users: number; orders: number; orders_pending: number; topups_pending: number
+  revenue: number; revenue_delivered: number; pending_value: number; refunded: number; late: number
+  monthly: { month: string; total: number }[]
 }
 
 export default function AdminPage({ onChanged }: { onChanged: () => void }) {
   const [tab, setTab] = useState<(typeof TABS)[number][0]>('ringkasan')
-  const [d, setD] = useState<{ orders: Row[]; products: Row[]; topups: Row[]; users: Row[]; categories: Row[] }>({ orders: [], products: [], topups: [], users: [], categories: [] })
+  const [d, setD] = useState<{ products: Row[]; categories: Row[] }>({ products: [], categories: [] })
+  const [stats, setStats] = useState<Stats | null>(null)
+  // Daftar pengguna hanya dimuat untuk pratinjau penerima di tab Pesan (maks. 1000). Tab Pengguna memakai paginasi server.
+  const [users, setUsers] = useState<Row[] | null>(null)
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState<number | null>(null)
   const [err, setErr] = useState('')
   const toast = useToast()
   const ask = useConfirm()
   const [loaded, setLoaded] = useState(false)
-  const [emailSearch, setEmailSearch] = useState('')
-  const [orderSearch, setOrderSearch] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [logoUploading, setLogoUploading] = useState(false)
-  const [detailUser, setDetailUser] = useState<Row | null>(null)
-  const [saldoAmount, setSaldoAmount] = useState('')
-  const [orderNotes, setOrderNotes] = useState<Record<number, string>>({})
   const [msgPrefill, setMsgPrefill] = useState<{ target: string; n: number } | null>(null)
-  const [cancelTarget, setCancelTarget] = useState<Row | null>(null)
-  const [cancelReason, setCancelReason] = useState('')
-  const [cancelRefund, setCancelRefund] = useState(true)
-  const [cancelRestock, setCancelRestock] = useState(false)
-  const [cancelBusy, setCancelBusy] = useState(false)
-  const [cancelErr, setCancelErr] = useState('')
   const [slaHours, setSlaHours] = useState(24) // 0 = penanda "terlambat" dimatikan
+
+  const loadStats = useCallback(async () => {
+    try { setStats(await api<Stats>('rpc/admin_stats', { method: 'POST', body: {} })) }
+    catch (e) { setErr((e as Error).message) }
+  }, [])
 
   const load = useCallback(async () => {
     try {
-      const [orders, products, topups, users, categories, settings] = await Promise.all([
-        api('orders?select=*&order=id.desc&limit=1000'), api('products?select=*&order=sort,id'),
-        api('topups?select=*&order=id.desc&limit=500'), api('profiles?select=*&order=created_at.desc&limit=1000'),
-        api('categories?select=*&order=sort,id'),
+      const [products, categories, settings] = await Promise.all([
+        api('products?select=*&order=sort,id'), api('categories?select=*&order=sort,id'),
         api('app_settings?select=key,value').catch(() => [] as Row[]),
       ])
       const rawSla = settings.find((x: Row) => x.key === 'pending_sla_hours')?.value
       const sla = rawSla === undefined || rawSla === '' ? 24 : Number(rawSla)
       setSlaHours(Number.isFinite(sla) && sla >= 0 ? sla : 24)
-      setD({ orders, products, topups, users, categories }); setErr('')
+      setD({ products, categories }); setErr('')
     } catch (e) { setErr((e as Error).message) } finally { setLoaded(true) }
   }, [])
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(); loadStats() }, [load, loadStats])
+
+  useEffect(() => {
+    if (tab !== 'pesan' || users) return
+    api('profiles?select=*&order=created_at.desc&limit=1000').then(setUsers).catch(() => setUsers([]))
+  }, [tab, users])
+
+  // Pengaturan (jam SLA, dll.) bisa berubah, muat ulang saat keluar dari tab itu.
+  const goTab = (id: (typeof TABS)[number][0]) => { if (tab === 'pengaturan') load(); setTab(id) }
+  const refreshAll = () => { loadStats(); onChanged() }
 
   const run = async (fn: () => Promise<unknown>, msg?: string) => {
     try {
@@ -95,9 +71,6 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       if (msg) toast(msg)
     } catch (e) { setErr((e as Error).message) }
   }
-  const who = (uid: string) => d.users.find(u => u.id === uid)?.email ?? uid.slice(0, 8)
-  const pending = d.orders.filter(o => o.status === 'pending').length + d.topups.filter(t => t.status === 'pending').length
-  const revenue = d.orders.filter(o => o.status === 'aktif').reduce((s, o) => s + Number(o.price), 0)
   const categoryNames = d.categories.map(c => c.name)
 
   // Kategori baru bisa langsung dipakai; jaga supaya form selalu punya kategori aktif yang valid.
@@ -107,85 +80,11 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
     }
   }, [d.categories]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const orderCode = (o: Row) => String(o.order_code ?? `ORD-${o.id}`)
-  const isLate = (o: Row) => slaHours > 0 && o.status === 'pending' && Date.now() - new Date(o.created_at).getTime() > slaHours * 3600000
-  const lateCount = d.orders.filter(isLate).length
-  const openCancel = (o: Row) => {
-    setCancelTarget(o); setCancelReason(''); setCancelRefund(true)
-    setCancelRestock(o.status === 'pending') // pending = belum ada data terkirim, aman dikembalikan ke stok
-    setCancelErr('')
-  }
-  async function doCancel() {
-    if (!cancelTarget) return
-    const code = orderCode(cancelTarget)
-    setCancelBusy(true); setCancelErr('')
-    try {
-      await api('rpc/cancel_order', { method: 'POST', body: { p_order_id: cancelTarget.id, p_reason: cancelReason.trim() || null, p_refund: cancelRefund, p_restock: cancelRestock } })
-      setCancelTarget(null)
-      await load(); onChanged()
-      toast(`Pesanan ${code} dibatalkan`)
-    } catch (e) { setCancelErr((e as Error).message) } finally { setCancelBusy(false) }
-  }
-  const copyOrderId = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code)
-      toast('Kode order disalin: ' + code)
-    } catch { toast('Gagal menyalin ID pesanan', 'error') }
-  }
-
-  const copyUserId = async (code: string) => {
-    try { await navigator.clipboard.writeText(code); toast('ID pengguna disalin: ' + code) }
-    catch { toast('Gagal menyalin ID pengguna', 'error') }
-  }
-  const messageUser = (u: Row) => {
-    setMsgPrefill({ target: u.user_code ?? u.email ?? '', n: Date.now() })
-    setDetailUser(null); setSaldoAmount(''); setTab('pesan')
-  }
-
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [resetPw, setResetPw] = useState('')
-  const oq = orderSearch.trim().toLowerCase()
-  const inRange = (iso: string) => {
-    const t = new Date(iso).getTime()
-    if (dateFrom && t < new Date(dateFrom + 'T00:00:00').getTime()) return false
-    if (dateTo && t > new Date(dateTo + 'T23:59:59').getTime()) return false
-    return true
-  }
-  const filteredOrders = d.orders.filter(o => inRange(o.created_at) && (!oq ||
-    orderCode(o).toLowerCase().includes(oq) || `ord-${o.id}`.includes(oq) ||
-    (o.product_name ?? '').toLowerCase().includes(oq) || who(o.user_id).toLowerCase().includes(oq)))
-
-  const downloadCsv = (name: string, rows: (string | number)[][]) => {
-    const esc = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const blob = new Blob(['\ufeff' + rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob); a.download = name; a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-  }
-  const exportOrders = () => downloadCsv(`pesanan-${new Date().toISOString().slice(0, 10)}.csv`, [
-    ['Kode', 'Tanggal', 'Pembeli', 'Produk', 'Kategori', 'Harga', 'Status'],
-    ...filteredOrders.map(o => [orderCode(o), new Date(o.created_at).toLocaleString('id-ID'), who(o.user_id), o.product_name ?? '', o.category ?? '', o.price, o.status]),
-  ])
-  const exportUsers = () => downloadCsv(`pengguna-${new Date().toISOString().slice(0, 10)}.csv`, [
-    ['ID', 'Email/Username', 'Nama', 'WhatsApp', 'Saldo', 'Bergabung'],
-    ...d.users.map(u => [u.user_code ?? '', rowHandle(u), u.full_name ?? '', u.whatsapp ?? '', u.saldo ?? 0, new Date(u.created_at).toLocaleString('id-ID')]),
-  ])
-  const monthly = Array.from({ length: 6 }, (_, i) => {
-    const dt = new Date(new Date().getFullYear(), new Date().getMonth() - 5 + i, 1)
-    const total = d.orders.filter(o => o.status === 'aktif').filter(o => { const x = new Date(o.created_at); return x.getFullYear() === dt.getFullYear() && x.getMonth() === dt.getMonth() }).reduce((s, o) => s + Number(o.price), 0)
-    return { label: dt.toLocaleDateString('id-ID', { month: 'short' }), total }
-  })
+  const monthly = (stats?.monthly ?? []).map(m => ({
+    label: new Date(m.month + '-01T00:00:00').toLocaleDateString('id-ID', { month: 'short' }),
+    total: Number(m.total),
+  }))
   const monthlyMax = Math.max(...monthly.map(m => m.total), 1)
-
-  async function doResetPassword() {
-    if (!detailUser) return
-    if (resetPw.length < 6) { setErr('Password baru minimal 6 karakter'); return }
-    try {
-      await apiFn('admin-reset-password', { method: 'POST', body: { user_id: detailUser.id, new_password: resetPw } })
-      setResetPw(''); setErr(''); toast('Password berhasil direset')
-    } catch (e) { setErr((e as Error).message) }
-  }
 
   const saveProduct = () => run(async () => {
     if (!form.name.trim() || !Number(form.price)) throw new Error('Nama dan harga wajib diisi')
@@ -228,17 +127,6 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       run(() => api(`categories?id=eq.${c.id}`, { method: 'DELETE' }), 'Kategori dihapus')
   }
 
-  const saveAccountData = (o: Row) => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: (() => { const data = orderNotes[o.id] ?? o.account_data ?? ''; return o.status === 'pending' && data.trim() ? { account_data: data, status: 'aktif' } : { account_data: data } })() }), 'Data akun disimpan')
-
-  const adjustSaldo = (delta: number) => {
-    if (!detailUser || !delta) return
-    run(() => api('rpc/admin_adjust_saldo', { method: 'POST', body: { target_uid: detailUser.id, delta } }),
-      delta > 0 ? 'Saldo berhasil ditambahkan' : 'Saldo berhasil dikembalikan').then(() => {
-      setSaldoAmount('')
-      setDetailUser(u => u ? { ...u, saldo: Math.max(0, Number(u.saldo ?? 0) + delta) } : u)
-    })
-  }
-
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard Admin" subtitle="Kelola pesanan, produk, top up, dan pengguna."
@@ -247,7 +135,7 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
       <div className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto no-scrollbar">
         <div className="inline-flex gap-1 p-1 rounded-[14px] bg-[#111827]" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
           {TABS.map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={`chip ${tab === id ? 'chip-active' : ''}`}>{label}</button>
+            <button key={id} onClick={() => goTab(id)} className={`chip ${tab === id ? 'chip-active' : ''}`}>{label}</button>
           ))}
         </div>
       </div>
@@ -257,7 +145,12 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
 
       {loaded && tab === 'ringkasan' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-          {([['users', 'Pengguna', d.users.length], ['clipboard', 'Pesanan', d.orders.length], ['clock', 'Menunggu', pending], ['wallet', 'Pendapatan', formatRp(revenue)]] as [IconName, string, string | number][]).map(([ic, label, val]) => (
+          {([
+            ['users', 'Pengguna', stats ? stats.users : '-'],
+            ['clipboard', 'Pesanan', stats ? stats.orders : '-'],
+            ['clock', 'Menunggu', stats ? stats.orders_pending + stats.topups_pending : '-'],
+            ['wallet', 'Pendapatan', stats ? formatRp(stats.revenue) : '-'],
+          ] as [IconName, string, string | number][]).map(([ic, label, val]) => (
             <div key={label} className="card card-interactive flex items-center gap-4 px-4 py-4 sm:px-5">
               <div className="icon-tile"><Icon name={ic} size={18} /></div>
               <div className="min-w-0">
@@ -269,13 +162,28 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
+      {loaded && tab === 'ringkasan' && stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {([
+            ['Sudah dikirim (aktif)', formatRp(stats.revenue_delivered)],
+            ['Sudah dibayar, belum diproses', formatRp(stats.pending_value)],
+            ['Total refund', formatRp(stats.refunded)],
+          ] as [string, string][]).map(([label, val]) => (
+            <div key={label} className="card-inset p-4">
+              <p className="text-[12px] text-muted-foreground">{label}</p>
+              <p className="text-base font-semibold text-white tabular mt-0.5">{val}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {loaded && tab === 'ringkasan' && (
         <div className="card p-4 sm:p-5">
           <p className="section-title">Omzet 6 bulan terakhir</p>
-          <p className="text-xs text-muted-foreground mt-0.5 mb-4">Pesanan berstatus aktif</p>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-4">Semua pesanan yang tidak dibatalkan (waktu WIB)</p>
           <div className="flex items-end gap-2 h-36">
             {monthly.map(m => (
-              <div key={m.label} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full min-w-0">
+              <div key={m.label + m.total} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full min-w-0">
                 <span className="text-[10px] text-muted-foreground tabular truncate max-w-full">{m.total > 0 ? formatRp(m.total) : ''}</span>
                 <div className="w-full rounded-md" style={{ height: `${Math.max((m.total / monthlyMax) * 100, 3)}%`, background: 'linear-gradient(180deg, #4d8dff 0%, #2657c9 100%)', opacity: m.total > 0 ? 1 : 0.25 }} />
                 <span className="text-[11px] text-muted-foreground">{m.label}</span>
@@ -285,86 +193,9 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
-      {loaded && tab === 'pesanan' && (
-        <div className="space-y-4">
-          {lateCount > 0 && (
-            <div className="alert alert-warning">
-              <Icon name="clock" size={16} className="mt-0.5 flex-shrink-0" />
-              <span>{lateCount} pesanan pending sudah lebih dari {slaHours} jam. Segera proses atau batalkan &amp; refund.</span>
-            </div>
-          )}
-          <div className="card p-4 sm:p-5 space-y-2">
-            <Field label="Cari kode order (mis. ORD-K7M2QX9P), nama produk, atau email pembeli">
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={MUTED}><Icon name="search" size={16} /></span>
-                <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. ORD-K7M2QX9P" value={orderSearch} onChange={e => setOrderSearch(e.target.value)} />
-              </div>
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Dari tanggal"><input className={FIELD} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></Field>
-              <Field label="Sampai tanggal"><input className={FIELD} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} /></Field>
-            </div>
-            <div className="flex justify-end pt-1"><Btn onClick={exportOrders} variant="secondary"><Icon name="upload" size={14} /> Ekspor CSV</Btn></div>
-            {oq && <p className="hint">{filteredOrders.length > 0 ? `Ditemukan ${filteredOrders.length} pesanan cocok.` : 'Tidak ada pesanan yang cocok.'}</p>}
-          </div>
-          {filteredOrders.length === 0 ? (
-            <div className="card"><EmptyState icon="clipboard" title={oq ? 'Tidak ada pesanan yang cocok dengan pencarian.' : 'Belum ada pesanan.'} /></div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
-              {filteredOrders.map(o => (
-                <div key={o.id} className="card p-4 sm:p-5 space-y-4">
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="min-w-0 flex items-center gap-3">
-                      <ProductThumb url={o.logo_url} size={40} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{o.product_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{who(o.user_id)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-semibold text-white tabular whitespace-nowrap">{formatRp(o.price)}</p>
-                      <div className="mt-1 flex items-center justify-end gap-1.5">{isLate(o) && <span className="badge badge-warning">Terlambat</span>}<StatusBadge status={o.status} /></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5">
-                    <span className="text-[13px] font-medium text-white flex-1 truncate font-mono">{orderCode(o)}</span>
-                    <button onClick={() => copyOrderId(orderCode(o))} className="btn btn-ghost btn-sm" aria-label="Salin ID pesanan">
-                      <Icon name="copy" size={14} /> Salin ID
-                    </button>
-                  </div>
-                  {(o.buyer_whatsapp || o.buyer_contact_email) && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Icon name="mail" size={13} /> Kontak: {o.buyer_contact_email ?? '-'}{o.buyer_whatsapp ? ` · WA ${o.buyer_whatsapp}` : ''}</p>
-                  )}
-                  {o.status === 'dibatalkan' ? (
-                    <div className="alert alert-warning">
-                      <Icon name="info" size={16} className="mt-0.5 flex-shrink-0" />
-                      <p className="text-[13px]">
-                        Dibatalkan{o.cancelled_at ? ` ${new Date(o.cancelled_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}.
-                        {' '}{Number(o.refunded_amount) > 0 ? `Refund ${formatRp(o.refunded_amount)}.` : 'Tanpa refund.'}
-                        {o.cancel_reason ? ` Alasan: ${o.cancel_reason}` : ''}
-                      </p>
-                    </div>
-                  ) : (<>
-                  <Field label="Status">
-                    <select value={o.status} onChange={e => run(() => api(`orders?id=eq.${o.id}`, { method: 'PATCH', body: { status: e.target.value } }))} className={FIELD} style={FIELD_STYLE}>
-                      <option value="pending">Menunggu konfirmasi</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option>
-                    </select>
-                  </Field>
-                  <Field label="Data akun / info penting (dikirim ke user)">
-                    <textarea className="input" rows={2} placeholder="mis. IP: 1.2.3.4, user: root, pass: ****"
-                      value={orderNotes[o.id] ?? o.account_data ?? ''} onChange={e => setOrderNotes(prev => ({ ...prev, [o.id]: e.target.value }))} />
-                  </Field>
-                  <div className="flex justify-end gap-2">
-                    <Btn onClick={() => openCancel(o)} variant="danger"><Icon name="x" size={14} /> Batalkan &amp; Refund</Btn>
-                    <Btn onClick={() => saveAccountData(o)} variant="primary"><Icon name="check" size={14} /> Simpan Data Akun</Btn>
-                  </div>
-                  </>)}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {loaded && tab === 'pesanan' && <AdminOrders slaHours={slaHours} lateCount={stats?.late ?? 0} onChanged={refreshAll} />}
+      {loaded && tab === 'pengguna' && <AdminUsers onChanged={refreshAll} onMessage={u => { setMsgPrefill({ target: u.user_code ?? u.email ?? '', n: Date.now() }); setTab('pesan') }} />}
+      {loaded && tab === 'topup' && <AdminTopups onChanged={refreshAll} />}
 
       {loaded && tab === 'produk' && (
         <div className="space-y-4">
@@ -471,133 +302,15 @@ export default function AdminPage({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
 
-      {loaded && tab === 'pengguna' && (() => {
-        const q = emailSearch.trim().toLowerCase()
-        const filtered = q ? d.users.filter(u => [u.email, u.user_code, u.username, u.full_name].some(v => String(v ?? '').toLowerCase().includes(q))) : d.users
-        return (
-          <div className="space-y-4">
-            <div className="card p-4 sm:p-5 space-y-2">
-              <Field label="Cari pengguna (email, ID pengguna, atau username)">
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={MUTED}><Icon name="search" size={16} /></span>
-                  <input className="input" style={{ paddingLeft: 40 }} placeholder="mis. nama@gmail.com atau USR-K7M2QX9P" value={emailSearch} onChange={e => setEmailSearch(e.target.value)} />
-                </div>
-              </Field>
-              <div className="flex justify-end pt-1"><Btn onClick={exportUsers} variant="secondary"><Icon name="upload" size={14} /> Ekspor CSV</Btn></div>
-              {q && <p className="hint">{filtered.length > 0 ? `Ditemukan ${filtered.length} pengguna cocok.` : 'Pengguna tidak terdaftar.'}</p>}
-            </div>
-            <div className="card overflow-hidden">
-              {filtered.length === 0 ? (
-                <EmptyState icon="users" title={q ? `Tidak ada pengguna yang cocok dengan "${emailSearch}"` : 'Belum ada pengguna.'} />
-              ) : (
-                <div className="divide-y divide-white/[0.06]">
-                  {filtered.map(u => (
-                    <div key={u.id} className="px-4 sm:px-5 py-3 flex items-center gap-3 transition-colors duration-200 hover:bg-white/[0.02]">
-                      <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="mail" size={16} /></div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-white truncate">{rowHandle(u)}</p>
-                        {u.user_code && <p className="text-[11px] text-muted-foreground font-mono truncate">{u.user_code}</p>}
-                      </div>
-                      <Btn onClick={() => setDetailUser(u)} variant="secondary"><Icon name="eye" size={14} /> Detail</Btn>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )
-      })()}
-
-      {loaded && tab === 'pesan' && <AdminMessages users={d.users} prefill={msgPrefill} />}
+      {loaded && tab === 'pesan' && (users
+        ? <AdminMessages users={users} prefill={msgPrefill} />
+        : <div className="card overflow-hidden"><SkeletonRows rows={2} /></div>)}
       {loaded && tab === 'voucher' && <AdminVouchers />}
       {loaded && tab === 'stok' && <AdminStock products={d.products} />}
+      {loaded && tab === 'bot' && <AdminBot />}
       {loaded && tab === 'audit' && <AdminAudit />}
       {loaded && tab === 'pengaturan' && <AdminSettings />}
 
-      {loaded && tab === 'topup' && (
-        <div className="card overflow-hidden">
-          {d.topups.length === 0 ? <EmptyState icon="wallet" title="Belum ada permintaan top up." /> : (
-            <div className="divide-y divide-white/[0.06]">
-              {d.topups.map(t => (
-                <div key={t.id} className="px-4 sm:px-5 py-3.5 flex items-center gap-3 flex-wrap sm:flex-nowrap">
-                  <div className="icon-tile" style={{ width: 36, height: 36, borderRadius: 10 }}><Icon name="wallet" size={16} /></div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white tabular">{formatRp(t.amount)}</p>
-                    <p className="text-xs text-muted-foreground truncate">{who(t.user_id)}</p>
-                  </div>
-                  <StatusBadge status={t.status} />
-                  {t.status === 'pending' && <div className="flex gap-1.5 ml-auto">
-                    <Btn onClick={() => run(() => api('rpc/approve_topup', { method: 'POST', body: { tid: t.id } }))} variant="success"><Icon name="check" size={14} strokeWidth={2.5} /> Setujui</Btn>
-                    <Btn onClick={() => run(() => api(`topups?id=eq.${t.id}`, { method: 'PATCH', body: { status: 'rejected' } }))} variant="danger"><Icon name="x" size={14} /></Btn>
-                  </div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {detailUser && (
-        <Modal title="Detail Pengguna" onClose={() => { setDetailUser(null); setSaldoAmount(''); setResetPw('') }}>
-          <div className="flex items-center gap-3">
-            <div className="icon-tile" style={{ width: 44, height: 44 }}><Icon name="mail" size={18} /></div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{rowHandle(detailUser)}</p>
-              <p className="text-xs text-muted-foreground">{detailUser.full_name ?? 'Tanpa nama'}</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="card-inset p-3"><p className="text-[11px] text-muted-foreground">Bergabung</p><p className="text-[13px] text-white font-medium mt-0.5">{new Date(detailUser.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
-            <div className="card-inset p-3"><p className="text-[11px] text-muted-foreground">Saldo sekarang</p><p className="text-[13px] text-white font-medium tabular mt-0.5">{formatRp(detailUser.saldo ?? 0)}</p></div>
-            <div className="card-inset p-3 col-span-2 flex items-center gap-2">
-              <div className="min-w-0 flex-1"><p className="text-[11px] text-muted-foreground">ID pengguna</p><p className="text-[13px] text-white font-medium font-mono mt-0.5 truncate">{detailUser.user_code ?? '-'}</p></div>
-              {detailUser.user_code && <button onClick={() => copyUserId(detailUser.user_code)} className="btn btn-ghost btn-sm" aria-label="Salin ID pengguna"><Icon name="copy" size={14} /> Salin</button>}
-            </div>
-            <div className="card-inset p-3 col-span-2"><p className="text-[11px] text-muted-foreground">Nomor HP / WhatsApp</p><p className="text-[13px] text-white font-medium mt-0.5">{detailUser.whatsapp || '-'}</p></div>
-          </div>
-          <Field label="Nominal (Rp)">
-            <input className="input" inputMode="numeric" placeholder="mis. 50000" value={saldoAmount} onChange={e => setSaldoAmount(e.target.value)} />
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => adjustSaldo(Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-primary"><Icon name="plus" size={15} /> Tambah Saldo</button>
-            <button onClick={() => adjustSaldo(-Number(saldoAmount.replace(/\D/g, '')))} disabled={!saldoAmount} className="btn btn-secondary"><Icon name="wallet" size={15} /> Refund / Kembalikan</button>
-          </div>
-          {String(detailUser.email ?? '').endsWith('@users.tuyyistore.internal') && (
-            <div className="space-y-2">
-              <Field label="Reset password akun username">
-                <div className="flex gap-2">
-                  <input className="input" type="text" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="Password baru (min. 6 karakter)" autoComplete="off" />
-                  <button onClick={doResetPassword} disabled={resetPw.length < 6} className="btn btn-secondary flex-shrink-0">Reset</button>
-                </div>
-              </Field>
-            </div>
-          )}
-          <button onClick={() => messageUser(detailUser)} className="btn btn-secondary w-full"><Icon name="send" size={15} /> Kirim Pesan ke Pengguna Ini</button>
-        </Modal>
-      )}
-
-      {cancelTarget && (
-        <Modal title={`Batalkan ${orderCode(cancelTarget)}`} onClose={() => { if (!cancelBusy) setCancelTarget(null) }}>
-          <p className="text-[13px] text-slate-300">{cancelTarget.product_name} · {formatRp(cancelTarget.price)} · {who(cancelTarget.user_id)}</p>
-          {cancelErr && <div className="alert alert-danger"><Icon name="info" size={16} className="mt-0.5 flex-shrink-0" /><span>{cancelErr}</span></div>}
-          <Field label="Alasan (dikirim ke pembeli lewat notifikasi & WhatsApp)">
-            <textarea className="input" rows={2} value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="mis. Stok kosong dari supplier" />
-          </Field>
-          <label className="flex items-start gap-2 text-[13px] text-slate-200">
-            <input type="checkbox" className="mt-0.5" checked={cancelRefund} onChange={e => setCancelRefund(e.target.checked)} />
-            <span>Kembalikan {formatRp(cancelTarget.price)} ke saldo pembeli</span>
-          </label>
-          <label className="flex items-start gap-2 text-[13px] text-slate-200">
-            <input type="checkbox" className="mt-0.5" checked={cancelRestock} onChange={e => setCancelRestock(e.target.checked)} />
-            <span>Kembalikan stok produk. Untuk produk kirim otomatis, data akun masuk lagi ke daftar stok. Jangan dicentang kalau pembeli sudah memakainya.</span>
-          </label>
-          <p className="hint">Tindakan ini tidak bisa dibatalkan. Voucher yang dipakai ikut dikembalikan bila semua pesanan dari pembelian itu dibatalkan.</p>
-          <div className="flex justify-end gap-2">
-            <Btn onClick={() => setCancelTarget(null)} variant="secondary" disabled={cancelBusy}>Tutup</Btn>
-            <Btn onClick={doCancel} variant="danger" disabled={cancelBusy}>{cancelBusy ? 'Memproses...' : 'Batalkan pesanan'}</Btn>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }

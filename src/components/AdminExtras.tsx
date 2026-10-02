@@ -161,7 +161,7 @@ export function AdminStock({ products }: { products: Row[] }) {
 
 export function AdminAudit() {
   const { data, err, reload } = useLoad(() => api('audit_log?select=*&order=id.desc&limit=100'))
-  const label: Record<string, string> = { saldo: 'Saldo berubah', order: 'Pesanan diubah', topup: 'Top up diproses', reset_password: 'Reset password' }
+  const label: Record<string, string> = { saldo: 'Saldo berubah', order: 'Pesanan diubah', topup: 'Top up diproses', reset_password: 'Reset password', wa_bot: 'Bot WhatsApp' }
   const describe = (r: Row) => {
     const x = r.detail ?? {}
     if (r.action === 'saldo') return `${formatRp(x.before ?? 0)} → ${formatRp(x.after ?? 0)} (${Number(x.delta) > 0 ? '+' : ''}${formatRp(x.delta ?? 0)})`
@@ -200,6 +200,7 @@ export function AdminSettings() {
   const [adminWa, setAdminWa] = useState<string | null>(null)
   const [slaHrs, setSlaHrs] = useState<string | null>(null)
   const [autoHrs, setAutoHrs] = useState<string | null>(null)
+  const [expireHrs, setExpireHrs] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -208,6 +209,7 @@ export function AdminSettings() {
   const wa = adminWa ?? cur('admin_wa')
   const sla = slaHrs ?? cur('pending_sla_hours')
   const auto = autoHrs ?? cur('pending_autorefund_hours')
+  const expire = expireHrs ?? cur('topup_expire_hours')
   const hours = (v: string) => String(Math.max(0, Math.floor(Number(v.replace(/\D/g, '')) || 0)))
 
   async function save() {
@@ -218,8 +220,9 @@ export function AdminSettings() {
         api('app_settings?key=eq.admin_wa', { method: 'PATCH', body: { value: wa.trim() } }),
         api('app_settings?key=eq.pending_sla_hours', { method: 'PATCH', body: { value: hours(sla) } }),
         api('app_settings?key=eq.pending_autorefund_hours', { method: 'PATCH', body: { value: hours(auto) } }),
+        api('app_settings?key=eq.topup_expire_hours', { method: 'PATCH', body: { value: hours(expire) } }),
       ])
-      toast('Pengaturan disimpan'); setPayInfo(null); setAdminWa(null); setSlaHrs(null); setAutoHrs(null); reload()
+      toast('Pengaturan disimpan'); setPayInfo(null); setAdminWa(null); setSlaHrs(null); setAutoHrs(null); setExpireHrs(null); reload()
     } catch (e) { setMsg((e as Error).message) } finally { setSaving(false) }
   }
 
@@ -241,7 +244,10 @@ export function AdminSettings() {
             <input className={FIELD} inputMode="numeric" value={auto} onChange={e => setAutoHrs(e.target.value)} />
           </Field>
         </div>
-        <p className="hint">Pengingat ke WhatsApp admin dan auto-refund berjalan lewat jadwal pg_cron (lihat akhir migration_v13.sql).</p>
+        <Field label="Permintaan top up kedaluwarsa setelah (jam, 0 = tidak pernah)">
+          <input className={FIELD} inputMode="numeric" value={expire} onChange={e => setExpireHrs(e.target.value)} />
+        </Field>
+        <p className="hint">Pengingat ke WhatsApp admin, auto-refund, dan penandaan top up kedaluwarsa berjalan lewat jadwal pg_cron (lihat akhir migration_v13.sql). Top up juga ditandai kedaluwarsa saat ada yang membuat permintaan baru.</p>
         <div className="flex justify-end"><button onClick={save} disabled={saving || !data} className="btn btn-sm btn-primary"><Icon name="check" size={14} strokeWidth={2.25} /> Simpan</button></div>
       </div>
     </div>

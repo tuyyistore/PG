@@ -23,3 +23,7 @@ logs/
 # Vercel
 .vercel/
 !.env.example
+
+# Bot WhatsApp
+bot/auth/
+bot/node_modules/

@@ -1,5 +1,20 @@
 # Ringkasan Perubahan
 
+## v15: Bot WhatsApp di Admin (terbaru)
+
+- **Database:** jalankan `supabase/migration_v15.sql` (setelah v14). Tabel `wa_bot` (status, QR, kode pairing, heartbeat) dan `wa_bot_commands`; RPC `admin_wa_bot_command`, `admin_wa_test`, `admin_wa_stats`. Hanya admin yang bisa membaca QR/kode.
+- **Admin → Bot WA:** sambungkan nomor lewat **QR** atau **kode pairing**, lihat status/nomor terhubung, mulai ulang, putuskan, kirim pesan uji, dan lihat antrean/terkirim/gagal 24 jam. Status diperbarui otomatis (polling ±2,5 dtk); bila bot tidak mengirim heartbeat >45 dtk tampil "Bot mati".
+- **Bot:** `bot/index.mjs` (baru, Baileys). Mengambil perintah dari website, menulis status balik ke `wa_bot`, dan menjalankan `startOutbox` (OTP + notifikasi) setiap tersambung. Sesi di `bot/auth/`, sambung ulang otomatis. Cara pasang: `bot/README.md`. Bot lama yang sudah memanggil `startOutbox(sock)` sendiri sebaiknya diganti dengan bot ini agar tidak ada dua sesi.
+
+## Review v14: top up, verifikasi WhatsApp, admin berskala, tooling
+
+- **Database:** jalankan `supabase/migration_v14.sql` (setelah v13) **bersamaan dengan deploy kode terbaru**. Butuh PostgreSQL 15+ (view `security_invoker`). Bot WA (`bot/wa-outbox.mjs`) juga perlu di-redeploy.
+- **Top up:** permintaan pending kedaluwarsa otomatis (default 24 jam, atur di Admin → Pengaturan; ditandai saat ada permintaan baru atau lewat `process_stale_pending_orders()`). User bisa membatalkan permintaannya sendiri. Admin masih bisa menyetujui permintaan yang sudah kedaluwarsa. Setujui top up kini minta konfirmasi dan menampilkan nominal transfer (nominal + kode unik). Nomor WhatsApp admin di halaman Saldo diambil dari pengaturan `admin_wa` (nomor lama jadi cadangan bila kosong).
+- **Verifikasi WhatsApp (OTP):** nomor kini hanya bisa diubah lewat kode OTP yang dikirim bot (`request_wa_otp` / `verify_wa_otp`; 6 digit, berlaku 5 menit, maks. 5 percobaan, 5 permintaan per jam per user dan 3 per jam per nomor). Satu nomor terverifikasi hanya untuk satu akun. Notifikasi WA ke user dan bonus referral hanya berlaku untuk nomor terverifikasi. **Akun lama tidak otomatis terverifikasi**: notifikasi WA mereka berhenti sampai mereka verifikasi di Pengaturan. Kode OTP dihapus dari tabel `wa_outbox` setelah terkirim.
+- **Admin berskala:** statistik (omzet, jumlah, terlambat, grafik 6 bulan WIB) dihitung di server lewat `admin_stats()`. Omzet kini semua pesanan yang tidak dibatalkan, bukan hanya `aktif`. Tab Pesanan, Pengguna, dan Top Up memakai paginasi, pencarian, dan filter di server (view `admin_orders` / `admin_topups`), tanpa batas 1000/500 baris. Ekspor CSV mengambil semua hasil filter dan menetralkan formula injection (`=`, `+`, `-`, `@`). `AdminPage.tsx` dipecah (40 KB menjadi 20 KB) menjadi `AdminOrders`, `AdminUsers`, `AdminTopups`, dan `adminKit`. Daftar pengguna untuk pratinjau penerima di tab Pesan masih dimuat maks. 1000.
+- **Teknis:** keranjang bertahan saat refresh (hanya id produk disimpan; harga dan stok diambil ulang dari katalog). `src/ProfilePage.tsx` duplikat dihapus. Script `pnpm typecheck` dan `pnpm test` (tes `node:test` untuk helper CSV/filter), serta CI GitHub Actions (typecheck, test, build). Header keamanan di `vercel.json`: nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, HSTS, dan CSP dalam mode **Report-Only**. Buka situs, cek konsol browser untuk pelanggaran CSP (Chaport, Turnstile, Supabase), sesuaikan daftar host, lalu ganti nama header menjadi `Content-Security-Policy` agar ditegakkan.
+- **Sengaja belum diubah:** `public/sw.js` (kosong; toko ini tidak berguna offline, baru layak diisi bila web push dibuat) dan migrasi login Google/GitHub ke `supabase-js` PKCE. Yang kedua mengubah sesi semua user dan harus diuji dengan OAuth sungguhan di staging dulu.
+
 ## Review v13: keamanan toko, pembatalan + refund, SLA pending (terbaru)
 
 - **Database:** jalankan `supabase/migration_v13.sql` (setelah v12) **bersamaan dengan deploy kode terbaru**. `buy_with_saldo` kini mengembalikan array kosong (bukan error) saat voucher gagal, dan ada status pesanan baru `dibatalkan`.

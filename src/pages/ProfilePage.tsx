@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, displayName, uploadFile, type Row, type SessionUser } from '../lib/supabase'
 import { Icon, PageHeader } from '../ui'
 import { useToast } from '../feedback'
@@ -11,7 +11,11 @@ const AVATAR_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png':
 
 export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: SessionUser; isAdmin: boolean; profile: Row | null; onSaved: (patch: Row) => void }) {
   const [name, setName] = useState(profile?.full_name ?? displayName(user))
-  const [whatsapp, setWhatsapp] = useState(profile?.whatsapp ?? '')
+  const [waInput, setWaInput] = useState(profile?.whatsapp ?? '')
+  const [waStep, setWaStep] = useState<'idle' | 'code'>('idle')
+  const [waCode, setWaCode] = useState('')
+  const [waBusy, setWaBusy] = useState(false)
+  const [waCooldown, setWaCooldown] = useState(0)
   const [contactEmail, setContactEmail] = useState(profile?.contact_email ?? user.email ?? '')
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? '')
   const [saving, setSaving] = useState(false)
@@ -22,8 +26,9 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
   async function save() {
     setSaving(true); setErr('')
     try {
-      await api(`profiles?id=eq.${user.id}`, { method: 'PATCH', body: { full_name: name.trim() || null, whatsapp: whatsapp.trim() || null, contact_email: contactEmail.trim() || null, avatar_url: avatarUrl || null } })
-      onSaved({ full_name: name.trim(), whatsapp: whatsapp.trim(), contact_email: contactEmail.trim(), avatar_url: avatarUrl })
+      // Nomor WhatsApp tidak ikut disimpan di sini; hanya bisa diubah lewat verifikasi OTP.
+      await api(`profiles?id=eq.${user.id}`, { method: 'PATCH', body: { full_name: name.trim() || null, contact_email: contactEmail.trim() || null, avatar_url: avatarUrl || null } })
+      onSaved({ full_name: name.trim(), contact_email: contactEmail.trim(), avatar_url: avatarUrl })
       toast('Pengaturan berhasil disimpan')
     } catch (e) { setErr((e as Error).message) } finally { setSaving(false) }
   }
@@ -31,6 +36,36 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
   async function copyUserId() {
     try { await navigator.clipboard.writeText(profile?.user_code ?? ''); toast('ID pengguna disalin: ' + profile?.user_code) }
     catch { toast('Gagal menyalin ID pengguna', 'error') }
+  }
+
+  const normWa = (v: string) => { const d = v.replace(/\D/g, ''); return d.startsWith('0') ? '62' + d.slice(1) : d }
+  const waVerified = Boolean(profile?.whatsapp_verified) && normWa(waInput) === normWa(profile?.whatsapp ?? '')
+
+  useEffect(() => {
+    if (waCooldown <= 0) return
+    const t = setTimeout(() => setWaCooldown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [waCooldown])
+
+  async function sendOtp() {
+    setWaBusy(true); setErr('')
+    try {
+      await api('rpc/request_wa_otp', { method: 'POST', body: { p_phone: waInput.trim() } })
+      setWaStep('code'); setWaCode(''); setWaCooldown(60)
+      toast('Kode verifikasi dikirim ke WhatsApp')
+    } catch (e) { setErr((e as Error).message) } finally { setWaBusy(false) }
+  }
+
+  async function checkOtp() {
+    setWaBusy(true); setErr('')
+    try {
+      const res = await api<{ ok: boolean; message?: string; whatsapp?: string }>('rpc/verify_wa_otp', { method: 'POST', body: { p_code: waCode.trim() } })
+      if (res.ok) {
+        onSaved({ whatsapp: res.whatsapp, whatsapp_verified: true })
+        setWaInput(res.whatsapp ?? waInput); setWaStep('idle'); setWaCode('')
+        toast('Nomor WhatsApp terverifikasi')
+      } else setErr(res.message ?? 'Kode salah')
+    } catch (e) { setErr((e as Error).message) } finally { setWaBusy(false) }
   }
 
   const [refInput, setRefInput] = useState('')
@@ -116,7 +151,7 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
         <section className="card">
           <div className="px-5 sm:px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <h2 className="section-title">Ajak teman</h2>
-            <p className="hint mt-1">Bagikan link ini. Kamu dapat bonus saldo Rp 2.000 saat temanmu menyelesaikan pembelian pertamanya.</p>
+            <p className="hint mt-1">Bagikan link ini. Kamu dapat bonus saldo Rp 2.000 saat temanmu menyelesaikan pembelian pertamanya (minimal Rp 10.000 dan nomor WhatsApp-nya sudah terverifikasi).</p>
           </div>
           <div className="px-5 sm:px-6 py-6 space-y-5">
             <div className="flex items-center gap-2 card-inset pl-3.5 pr-1.5 py-1.5 max-w-xl">
@@ -144,10 +179,24 @@ export function ProfilePage({ user, isAdmin, profile, onSaved }: { user: Session
           <p className="hint mt-1">Email &amp; nomor WhatsApp ini otomatis dipakai untuk mengisi data pembelian saat checkout.</p>
         </div>
         <div className="px-5 sm:px-6 py-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <label className="block">
+          <div className="block">
             <span className="label">Nomor WhatsApp</span>
-            <input className="input" value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="mis. 6281234567890" inputMode="tel" />
-          </label>
+            <div className="flex gap-2">
+              <input className="input" value={waInput} onChange={e => { setWaInput(e.target.value); setWaStep('idle') }} placeholder="mis. 081234567890" inputMode="tel" />
+              <button type="button" onClick={sendOtp} disabled={waBusy || waVerified || waCooldown > 0 || waInput.replace(/\D/g, '').length < 9} className="btn btn-secondary flex-shrink-0">
+                {waVerified ? 'Terverifikasi' : waCooldown > 0 ? `Kirim ulang (${waCooldown})` : waStep === 'code' ? 'Kirim ulang' : 'Kirim kode'}
+              </button>
+            </div>
+            {waVerified
+              ? <p className="hint mt-1.5 flex items-center gap-1.5"><Icon name="check" size={13} /> Nomor terverifikasi. Notifikasi pesanan dan saldo dikirim ke nomor ini.</p>
+              : <p className="hint mt-1.5">Belum diverifikasi. Notifikasi WhatsApp baru dikirim setelah nomor diverifikasi dengan kode yang kami kirim ke WhatsApp.</p>}
+            {waStep === 'code' && (
+              <div className="flex gap-2 mt-3">
+                <input className="input" value={waCode} onChange={e => setWaCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Kode 6 digit" inputMode="numeric" autoComplete="one-time-code" />
+                <button type="button" onClick={checkOtp} disabled={waBusy || waCode.length !== 6} className="btn btn-primary flex-shrink-0">{waBusy ? '...' : 'Verifikasi'}</button>
+              </div>
+            )}
+          </div>
           <label className="block">
             <span className="label">Email untuk isi otomatis pembelian</span>
             <input className="input" value={contactEmail} onChange={e => setContactEmail(e.target.value)} placeholder="email@contoh.com" type="email" />

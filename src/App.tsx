@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ADMIN_EMAIL, api, initSession, signOut, type Row, type Session } from './lib/supabase'
 import { captureReferral, applyStoredReferral } from './lib/referral'
@@ -66,6 +66,22 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [catalogLoaded, setCatalogLoaded] = useState(false)
+  // Keranjang bertahan saat refresh: yang disimpan hanya id produk; harga & stok diambil ulang dari katalog.
+  const cartHydrated = useRef(false)
+  useEffect(() => {
+    if (!catalogLoaded || cartHydrated.current) return
+    cartHydrated.current = true
+    try {
+      const ids: unknown = JSON.parse(localStorage.getItem('ts-cart') ?? '[]')
+      if (!Array.isArray(ids)) return
+      const restored: CartItem[] = products.filter(p => ids.includes(p.id)).map(p => ({ product: p, qty: 1 }))
+      if (restored.length) setCart(c => (c.length ? c : restored))
+    } catch { /* abaikan data rusak */ }
+  }, [catalogLoaded, products])
+  useEffect(() => {
+    if (!cartHydrated.current) return
+    try { localStorage.setItem('ts-cart', JSON.stringify(cart.map(i => i.product.id))) } catch { /* mode privat / penuh */ }
+  }, [cart])
   const [mineLoaded, setMineLoaded] = useState(false)
 
   const isAdmin = session?.user.email?.toLowerCase() === ADMIN_EMAIL
