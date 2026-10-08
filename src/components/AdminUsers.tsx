@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { api, apiFn, type Row } from '../lib/supabase'
+import { api, apiFn, MIN_PASSWORD_LENGTH, type Row } from '../lib/supabase'
 import { Icon, formatRp, EmptyState, SkeletonRows } from '../ui'
 import { useToast } from '../feedback'
 import { rowHandle } from '../lib/notifications'
@@ -42,7 +42,7 @@ export function AdminUsers({ onChanged, onMessage }: { onChanged: () => void; on
 
   async function doResetPassword() {
     if (!detailUser) return
-    if (resetPw.length < 6) { setErr('Password baru minimal 6 karakter'); return }
+    if (resetPw.length < MIN_PASSWORD_LENGTH) { setErr(`Password baru minimal ${MIN_PASSWORD_LENGTH} karakter`); return }
     try {
       await apiFn('admin-reset-password', { method: 'POST', body: { user_id: detailUser.id, new_password: resetPw } })
       setResetPw(''); setErr(''); toast('Password berhasil direset')
@@ -134,8 +134,8 @@ export function AdminUsers({ onChanged, onMessage }: { onChanged: () => void; on
             <div className="space-y-2">
               <Field label="Reset password akun username">
                 <div className="flex gap-2">
-                  <input className="input" type="text" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="Password baru (min. 6 karakter)" autoComplete="off" />
-                  <button onClick={doResetPassword} disabled={resetPw.length < 6} className="btn btn-secondary flex-shrink-0">Reset</button>
+                  <input className="input" type="text" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder={`Password baru (min. ${MIN_PASSWORD_LENGTH} karakter)`} autoComplete="off" />
+                  <button onClick={doResetPassword} disabled={resetPw.length < MIN_PASSWORD_LENGTH} className="btn btn-secondary flex-shrink-0">Reset</button>
                 </div>
               </Field>
             </div>

@@ -6,13 +6,17 @@ export type SessionUser = {
   user_metadata?: { full_name?: string; name?: string; avatar_url?: string; picture?: string; username?: string; whatsapp?: string }
 }
 export type Session = { access_token: string; refresh_token: string; expires_at: number; user: SessionUser }
+// TODO: ganti dengan tipe hasil `supabase gen types typescript` (butuh akses ke proyek Supabase) agar akses kolom diperiksa compiler.
 export type Row = Record<string, any>
+type TokenResponse = { access_token: string; refresh_token: string; expires_in: number; user: SessionUser }
 
 const BASE = ((import.meta.env?.VITE_SUPABASE_URL as string | undefined) ?? '').replace(/\/$/, '')
 const KEY = (import.meta.env?.VITE_SUPABASE_ANON_KEY as string | undefined) ?? ''
 export const configured = Boolean(BASE && KEY)
 export const TURNSTILE_SITE_KEY = (import.meta.env?.VITE_TURNSTILE_SITE_KEY as string | undefined) ?? ''
 export const ADMIN_EMAIL = 'warungtuyyi@gmail.com' // hanya untuk UI; hak akses dijaga RLS di database
+/** Samakan dengan MIN_PASSWORD_LENGTH di api/_password.js dan "Minimum password length" di Supabase → Authentication. */
+export const MIN_PASSWORD_LENGTH = 8
 export const displayName = (u: SessionUser) => u.user_metadata?.full_name || u.user_metadata?.name || u.user_metadata?.username || u.email || 'Pengguna'
 
 // Login username/password memakai akun Supabase Auth biasa, tapi GoTrue mewajibkan
@@ -36,7 +40,7 @@ function keep(s: Session | null) {
   current = s
   try { s ? localStorage.setItem(STORE, JSON.stringify(s)) : localStorage.removeItem(STORE) } catch {}
 }
-function toSession(d: any): Session {
+function toSession(d: TokenResponse): Session {
   return { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: now() + d.expires_in, user: d.user }
 }
 
@@ -63,7 +67,7 @@ function friendlyAuthError(raw: string): string {
   if (m.includes('already registered') || m.includes('already exists')) return 'Username sudah dipakai, coba yang lain.'
   if (m.includes('invalid login credentials')) return 'Username atau password salah.'
   if (m.includes('captcha')) return 'Verifikasi captcha gagal, muat ulang halaman lalu coba lagi.'
-  if (m.includes('password') && m.includes('character')) return 'Password minimal 6 karakter.'
+  if (m.includes('password') && m.includes('character')) return `Password minimal ${MIN_PASSWORD_LENGTH} karakter.`
   if (m.includes('email not confirmed')) return 'Akun belum bisa dipakai: konfirmasi email masih aktif di pengaturan Supabase. Nonaktifkan "Confirm email" agar login username langsung jalan.'
   return raw
 }
@@ -81,21 +85,21 @@ async function authRaw<T>(path: string, body: unknown): Promise<T> {
 
 /** Daftar akun baru dengan username + password (WhatsApp opsional). Langsung login kalau berhasil. */
 export async function signUpWithUsername(username: string, password: string, whatsapp?: string, captchaToken?: string): Promise<Session> {
-  const d = await authRaw<any>('signup', {
+  const d = await authRaw<Partial<TokenResponse>>('signup', {
     email: usernameToEmail(username),
     password,
     data: { username: username.trim(), full_name: username.trim(), whatsapp: whatsapp?.trim() || null },
     ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
   })
   if (!d.access_token) throw new Error('Pendaftaran butuh konfirmasi email, padahal ini akun username. Nonaktifkan "Confirm email" di pengaturan Supabase Auth.')
-  const s = toSession(d)
+  const s = toSession(d as TokenResponse)
   keep(s)
   return s
 }
 
 /** Masuk dengan username + password yang sudah terdaftar. */
 export async function signInWithUsername(username: string, password: string, captchaToken?: string): Promise<Session> {
-  const d = await authRaw<any>('token?grant_type=password', {
+  const d = await authRaw<TokenResponse>('token?grant_type=password', {
     email: usernameToEmail(username), password,
     ...(captchaToken ? { gotrue_meta_security: { captcha_token: captchaToken } } : {}),
   })
@@ -104,13 +108,39 @@ export async function signInWithUsername(username: string, password: string, cap
   return s
 }
 
+/**
+ * Tukar refresh token dengan sesi baru.
+ * - Jaringan putus / server 5xx → sesi lama DIPERTAHANKAN (jangan logout hanya karena sinyal hilang sebentar).
+ * - Ditolak server (4xx: token kedaluwarsa/dicabut/sudah dipakai) → sesi dihapus.
+ */
 async function refresh(s: Session): Promise<Session | null> {
+  let r: Response
   try {
-    const d = await auth<any>('token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: s.refresh_token }) })
-    const n: Session = { access_token: d.access_token, refresh_token: d.refresh_token, expires_at: now() + d.expires_in, user: d.user }
+    r = await fetch(`${BASE}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: s.refresh_token }),
+    })
+  } catch { return s }
+  if (r.status >= 500) return s
+  if (!r.ok) { keep(null); return null }
+  try {
+    const n = toSession((await r.json()) as TokenResponse)
     keep(n)
     return n
-  } catch { keep(null); return null }
+  } catch { return s }
+}
+
+// Satu refresh pada satu waktu: request yang datang bersamaan menunggu hasil yang sama.
+// Tanpa ini, refresh paralel + rotasi refresh token membuat refresh kedua gagal dan user terlogout.
+let refreshing: Promise<Session | null> | null = null
+function refreshOnce(s: Session): Promise<Session | null> {
+  if (!refreshing) refreshing = refresh(s).finally(() => { refreshing = null })
+  return refreshing
+}
+/** Segarkan token bila hampir habis. Dipakai semua pemanggil API. */
+async function fresh(): Promise<void> {
+  if (current && current.expires_at - 60 < now()) await refreshOnce(current)
 }
 
 /** Dipanggil sekali saat aplikasi dibuka: tangkap callback Google atau pulihkan sesi. */
@@ -128,7 +158,7 @@ export async function initSession(): Promise<Session | null> {
     } catch { return null }
   }
   try { const raw = localStorage.getItem(STORE); if (raw) current = JSON.parse(raw) } catch {}
-  if (current && current.expires_at - 60 < now()) return refresh(current)
+  if (current && current.expires_at - 60 < now()) return refreshOnce(current)
   return current
 }
 
@@ -140,7 +170,7 @@ export async function signOut() {
 
 /** Upload file ke Supabase Storage (bucket harus publik). Mengembalikan URL publik file. */
 export async function uploadFile(bucket: string, path: string, file: File): Promise<string> {
-  if (current && current.expires_at - 60 < now()) await refresh(current)
+  await fresh()
   const r = await fetch(`${BASE}/storage/v1/object/${bucket}/${path}`, {
     method: 'POST',
     headers: {
@@ -160,7 +190,7 @@ export async function uploadFile(bucket: string, path: string, file: File): Prom
 }
 
 export async function api<T = Row[]>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {
-  if (current && current.expires_at - 60 < now()) await refresh(current)
+  await fresh()
   const r = await fetch(`${BASE}/rest/v1/${path}`, {
     method: opt.method ?? 'GET',
     headers: { apikey: KEY, Authorization: `Bearer ${current?.access_token ?? KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -177,7 +207,7 @@ export async function api<T = Row[]>(path: string, opt: { method?: string; body?
 
 /** GET berhalaman: mengembalikan baris + total (header Content-Range, via Prefer: count=exact). */
 export async function apiPage<T = Row>(path: string): Promise<{ rows: T[]; total: number }> {
-  if (current && current.expires_at - 60 < now()) await refresh(current)
+  await fresh()
   const r = await fetch(`${BASE}/rest/v1/${path}`, {
     headers: { apikey: KEY, Authorization: `Bearer ${current?.access_token ?? KEY}`, 'Content-Type': 'application/json', Prefer: 'count=exact' },
   })
@@ -193,14 +223,21 @@ export async function apiPage<T = Row>(path: string): Promise<{ rows: T[]; total
 
 /** Panggil endpoint serverless kita sendiri (folder /api), otomatis membawa Bearer token sesi. */
 export async function apiFn<T = any>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {
-  if (current && current.expires_at - 60 < now()) await refresh(current)
+  await fresh()
   const r = await fetch(`/api/${path}`, {
     method: opt.method ?? 'GET',
     headers: { 'Content-Type': 'application/json', ...(current ? { Authorization: `Bearer ${current.access_token}` } : {}) },
     body: opt.body === undefined ? undefined : JSON.stringify(opt.body),
   })
   const txt = await r.text()
-  const data = txt ? JSON.parse(txt) : null
-  if (!r.ok) throw new Error(data?.error ?? r.statusText)
+  let data: unknown = null
+  try { data = txt ? JSON.parse(txt) : null } catch { /* bukan JSON, mis. halaman error Vercel (timeout/502) */ }
+  if (!r.ok) {
+    const msg = (data as { error?: unknown } | null)?.error
+    if (typeof msg === 'string' && msg) throw new Error(msg)
+    if (r.status === 504 || r.status === 408) throw new Error('Server terlalu lama merespons. Coba lagi sebentar.')
+    if (r.status >= 500) throw new Error('Server sedang bermasalah. Coba lagi sebentar.')
+    throw new Error(r.statusText || 'Permintaan gagal.')
+  }
   return data as T
 }

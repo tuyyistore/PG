@@ -62,3 +62,27 @@ export function evaluateTransaction(topup, tx) {
   if (next === 'pending') return { action: 'none', reason: 'still_pending' }
   return { action: 'mark', status: next }
 }
+
+/**
+ * Cache TTL sangat kecil (in-memory, per instance serverless) untuk meredam polling berlebihan ke gateway.
+ * Best effort: instance lain/cold start punya cache sendiri — cukup untuk menahan banyak tab/klien yang menembak bersamaan.
+ */
+export function createTtlCache(ttlMs, { now = Date.now, max = 500 } = {}) {
+  const m = new Map()
+  return {
+    get(key) {
+      const e = m.get(key)
+      if (!e) return undefined
+      if (now() - e.at >= ttlMs) { m.delete(key); return undefined }
+      return e.value
+    },
+    set(key, value) {
+      if (m.size >= max) { // buang entri tertua supaya memori tidak membengkak
+        const oldest = m.keys().next().value
+        m.delete(oldest)
+      }
+      m.set(key, { value, at: now() })
+    },
+    delete(key) { m.delete(key) },
+  }
+}

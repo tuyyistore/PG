@@ -1,5 +1,6 @@
 import { requireAdmin } from './_auth.js'
 import { supabaseAdmin } from './_supabaseAdmin.js'
+import { passwordError } from './_password.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method tidak diizinkan.' })
@@ -8,7 +9,8 @@ export default async function handler(req, res) {
 
   const { user_id, new_password } = req.body || {}
   if (typeof user_id !== 'string' || typeof new_password !== 'string') return res.status(400).json({ error: 'Data tidak lengkap.' })
-  if (new_password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter.' })
+  const pwErr = passwordError(new_password)
+  if (pwErr) return res.status(400).json({ error: pwErr })
 
   const { data: target, error: getErr } = await supabaseAdmin.auth.admin.getUserById(user_id)
   if (getErr || !target?.user) return res.status(404).json({ error: 'Pengguna tidak ditemukan.' })

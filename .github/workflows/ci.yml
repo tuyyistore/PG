@@ -10,12 +10,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Pengaman rahasia: gagalkan build bila ada file .env (selain .env.example) yang ter-commit.
+      - name: Tidak ada .env yang ter-commit
+        run: |
+          if git ls-files | grep -E '(^|/)\.env(\.[^/]+)?$' | grep -v -E '(^|/)\.env\.example$'; then
+            echo "::error::File .env ter-commit. Jalankan 'git rm --cached <file>', ROTASI semua rahasia di dalamnya, lalu bersihkan history (git filter-repo)."
+            exit 1
+          fi
+
       - uses: pnpm/action-setup@v4 # versi pnpm dibaca dari "packageManager" di package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: pnpm install
+      - name: Install dependensi
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            echo "::warning::pnpm-lock.yaml belum ada di repo → build tidak reproducible. Jalankan 'pnpm install' lokal lalu commit lockfile-nya."
+            pnpm install
+          fi
       - run: pnpm typecheck
+      - name: Lint (belum memblokir)
+        run: pnpm lint
+        continue-on-error: true # hapus baris ini setelah temuan lint awal dibereskan
       - run: pnpm test
       - run: pnpm build
       - run: node --check bot/wa-outbox.mjs
+      - run: node --check bot/index.mjs

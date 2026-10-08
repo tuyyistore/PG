@@ -9,7 +9,7 @@ Sistem TUYYI STORE berbasis **saldo**: customer top up → saldo bertambah → b
 1. Customer isi nominal di halaman **Saldo** → `POST /api/btz-create-topup`.
 2. Server membuat baris `topups` (`gateway='betabotz'`) lalu memanggil `POST /api/qris/create` Betabotz (API key dari env). `transactionId`, `accessKey`, `paymentUrl`, `qrisString`, `totalAmount`, `expiredAt` disimpan.
 3. Customer scan QR / buka `paymentUrl` dan membayar.
-4. Betabotz memanggil `POST /api/btz-callback?token=…` (utama). Halaman Saldo juga polling `GET /api/btz-status` tiap 5 dtk (fallback).
+4. Betabotz memanggil `POST /api/btz-callback?token=…` (utama). Halaman Saldo juga polling `GET /api/btz-status` (fallback) dengan backoff 5 → 30 dtk; server menahan panggilan berulang ke gateway selama 3 dtk per top up.
 5. Server **tidak mempercayai body callback**: ia hanya mengambil `transactionId`, lalu membaca ulang transaksi ke `GET /api/qris/transaction/:id?key=…` dan mencocokkan `transactionId`, `metadata.orderId` (`TOPUP-<id>`), dan `amount`.
 6. Bila status Betabotz `sukses`, RPC `settle_gateway_topup` mengubah `pending/expired → approved` dan menambah saldo **dalam satu transaksi** (idempoten).
 
@@ -30,7 +30,7 @@ Pemetaan status: `pending→pending`, `sukses→approved` (PAID), `expired→exp
 
 ## Tes
 
-- Unit test: `pnpm test` (termasuk `api/btz.test.js`: pemetaan status, validasi nominal/id, idempotensi callback+polling bersamaan, expired/cancel/gagal tidak kredit).
+- Unit test: `pnpm test` (termasuk `api/btz.test.js`: pemetaan status, validasi nominal/id, idempotensi callback+polling bersamaan, expired/cancel/gagal tidak kredit; `api/btz-handlers.test.js`: perilaku HTTP callback/status/cancel dan throttle).
 - Sandbox: dokumentasi menyebut "Coba di Sandbox" lewat login dashboard Betabotz. Untuk tes uji-coba manual:
   1. Deploy ke Vercel Production/Preview dengan env di atas (callback harus URL publik; preview dengan Deployment Protection akan memblokir callback).
   2. Top up Rp 1.000 dari halaman Saldo, bayar, lihat saldo naik otomatis.

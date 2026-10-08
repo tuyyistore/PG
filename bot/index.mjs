@@ -24,7 +24,7 @@ const logger = pino({ level: 'silent' })
 const errMsg = e => String(e?.message ?? e).slice(0, 300)
 
 let sock = null
-let outbox = null // interval startOutbox untuk socket aktif
+let outboxTimer = null // antrean wa_outbox: satu interval untuk seluruh umur proses (lihat wa-outbox.mjs)
 let gen = 0 // nomor generasi socket; event dari socket lama diabaikan
 let reconnectTimer = null
 let state = { status: 'offline', phone: null }
@@ -42,7 +42,6 @@ const wipeAuth = () => rm(AUTH_DIR, { recursive: true, force: true })
 function stopSocket() {
   gen++
   clearTimeout(reconnectTimer)
-  if (outbox) { clearInterval(outbox); outbox = null }
   if (sock) {
     try { sock.ev.removeAllListeners('connection.update'); sock.ev.removeAllListeners('creds.update'); sock.end(undefined) } catch {}
     sock = null
@@ -88,8 +87,6 @@ async function start(mode, phone) {
 
     if (connection === 'open') {
       const number = (s.user?.id ?? '').split(':')[0].split('@')[0]
-      if (outbox) clearInterval(outbox)
-      outbox = startOutbox(s)
       console.log('Tersambung sebagai', number)
       await publish({ status: 'connected', phone: number || null, qr: null, pairing_code: null, last_error: null })
     }
@@ -110,8 +107,7 @@ async function start(mode, phone) {
         await publish({ status: 'offline', qr: null, pairing_code: null, last_error: 'Waktu habis sebelum tertaut. Klik Sambungkan untuk mencoba lagi.' })
         return
       }
-      // Putus sementara: sambung ulang otomatis.
-      if (outbox) { clearInterval(outbox); outbox = null }
+      // Putus sementara: sambung ulang otomatis. Antrean tetap berjalan (OTP bisa lewat jalur cadangan bila ada).
       await publish({ status: 'connecting', qr: null, pairing_code: null, last_error: `Terputus (${code ?? '?'}), menyambung ulang…` })
       reconnectTimer = setTimeout(() => start('qr').catch(e => publish({ status: 'offline', last_error: errMsg(e) })), 3000)
     }
@@ -167,11 +163,12 @@ async function main() {
     await publish({ status: 'offline', phone: null, qr: null, pairing_code: null })
     console.log('Belum ada sesi. Sambungkan dari Admin → Bot WA.')
   }
+  outboxTimer = startOutbox({ getSock: () => (state.status === 'connected' ? sock : null) })
   setInterval(pollCommands, POLL_MS)
   setInterval(() => publish({}), HEARTBEAT_MS)
 }
 
-const shutdown = async () => { try { await publish({ status: 'offline' }) } catch {} process.exit(0) }
+const shutdown = async () => { clearInterval(outboxTimer); try { await publish({ status: 'offline' }) } catch {} process.exit(0) }
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
 process.on('unhandledRejection', e => console.error('unhandledRejection:', errMsg(e)))

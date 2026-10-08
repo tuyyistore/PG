@@ -35,3 +35,9 @@ export async function findOwned(id, userId) {
   if (error) throw new Error(`baca top up gagal: ${error.code ?? ''} ${error.message}`)
   return data
 }
+
+/** Tandai top up yang masih pending sebagai cancelled (setelah dibatalkan di gateway). Melempar error bila query gagal. */
+export async function markCancelled(id) {
+  const { error } = await supabaseAdmin.from('topups').update({ status: 'cancelled' }).eq('id', id).eq('status', 'pending')
+  if (error) throw new Error(`update top up gagal: ${error.code ?? ''} ${error.message}`)
+}

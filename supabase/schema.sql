@@ -1,3 +1,15 @@
+-- ════════════════════════════════════════════════════════════════════════
+-- ⚠ schema.sql = BOOTSTRAP AWAL (v1), BUKAN skema terkini.
+-- Setelah file ini, jalankan migration_v2.sql … migration_v19.sql BERURUTAN (lihat supabase/README.md).
+-- Bagian di bawah yang sudah digantikan migrasi berikutnya:
+--   • is_admin()                  → v12 (kini membaca tabel `admins`, bukan email yang di-hardcode)
+--   • approve_topup()             → v14 (boleh menyetujui yang sudah expired)
+--   • buy_with_saldo(bigint[])    → v12/v13/v14 (versi dengan voucher, stok, refund, dll.)
+--   • tabel payments / gobiz_*    → v8, v9, v19 (integrasi GoBiz/DOKU dibuang; kini Betabotz lewat v16)
+--   • topups.status check         → v14 (menambah expired/cancelled)
+-- Skema terkini yang sebenarnya ada di database langsung: `supabase db dump --schema public -f supabase/snapshot.sql`.
+-- ════════════════════════════════════════════════════════════════════════
+
 -- Jalankan di Supabase → SQL Editor (sekali saja).
 
 -- Admin = email Google warungtuyyi@gmail.com (login via provider Google).

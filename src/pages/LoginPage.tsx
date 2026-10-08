@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { configured, signInWithGoogle, signInWithGitHub, signInWithUsername, signUpWithUsername, TURNSTILE_SITE_KEY, type Session } from '../lib/supabase'
+import { configured, signInWithGoogle, signInWithGitHub, signInWithUsername, signUpWithUsername, TURNSTILE_SITE_KEY, MIN_PASSWORD_LENGTH, type Session } from '../lib/supabase'
 import { Icon } from '../ui'
 import { BrandMark } from '../components/Brand'
 import { Turnstile } from '../components/Turnstile'
@@ -27,6 +27,7 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
     e.preventDefault()
     if (!username.trim() || !password) { setErr('Username dan password wajib diisi.'); return }
     if (mode === 'signup' && whatsapp.replace(/\D/g, '').length < 9) { setErr('Nomor WhatsApp wajib diisi (dipakai untuk pemulihan akun).'); return }
+    if (mode === 'signup' && password.length < MIN_PASSWORD_LENGTH) { setErr(`Password minimal ${MIN_PASSWORD_LENGTH} karakter.`); return }
     if (TURNSTILE_SITE_KEY && !captcha) { setErr('Selesaikan verifikasi captcha dulu.'); return }
     setLoading(true); setErr('')
     try {
@@ -34,8 +35,8 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
         ? await signInWithUsername(username, password, captcha || undefined)
         : await signUpWithUsername(username, password, whatsapp, captcha || undefined)
       onAuthed(session)
-    } catch (e: any) {
-      setErr(e?.message || 'Gagal memproses permintaan. Coba lagi.')
+    } catch (e) {
+      setErr((e as Error)?.message || 'Gagal memproses permintaan. Coba lagi.')
       setLoading(false)
       setCaptchaReset(n => n + 1)
     }
@@ -111,7 +112,7 @@ export function LoginPage({ onAuthed }: { onAuthed: (s: Session) => void }) {
               <div className="relative">
                 <Icon name="lock" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
                 <input className="input" style={{ paddingLeft: 36, paddingRight: 36 }} type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="Minimal 6 karakter" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+                  placeholder={mode === 'signup' ? `Minimal ${MIN_PASSWORD_LENGTH} karakter` : 'Password'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
                 <button type="button" onClick={() => setShowPassword(s => !s)} tabIndex={-1}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-white transition-colors duration-150"
                   aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}>

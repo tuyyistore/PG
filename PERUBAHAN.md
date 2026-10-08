@@ -1,5 +1,41 @@
 # Ringkasan Perubahan
 
+## v19: Review keamanan, ketahanan, dan kebersihan (terbaru)
+
+**Tindakan manual SEGERA (tidak bisa dilakukan lewat kode):**
+- `.env` (berisi `SUPABASE_SERVICE_ROLE_KEY`, `GOPAY_TOKEN`, string QRIS) sempat ikut terbawa di arsip proyek. Anggap semuanya bocor:
+  1. Supabase → Project Settings → API → **regenerate service_role key**, lalu perbarui di Vercel dan `bot/.env`.
+  2. Cabut/keluar dari sesi GoBiz/GoPay yang tokennya ada di `.env` (token itu sudah tidak dipakai kode sejak v8).
+  3. Pertimbangkan merotasi `BETABOTZ_API_KEY` dan `BETABOTZ_WEBHOOK_SECRET` bila `.env` produksi pernah serupa.
+  4. Di repo: `git rm --cached .env`; bersihkan history bila repo pernah publik/dibagikan (`git filter-repo --path .env --invert-paths`), lalu aktifkan *secret scanning* GitHub.
+  5. CI kini gagal bila ada `.env` ter-commit (selain `.env.example`).
+- Supabase → Authentication → Policies: set **Minimum password length = 8** (penegak sebenarnya di pendaftaran).
+- Set `SITE_URL` di Vercel ke domain produksi final.
+- Jalankan `supabase/migration_v19.sql` (idempoten). `payments` hanya diganti nama jadi `payments_legacy` dan dikunci, tidak dihapus.
+- Jalankan `pnpm install` lalu **commit `pnpm-lock.yaml`** (belum ada di repo; CI menampilkan peringatan sampai ada).
+
+**Perubahan kode:**
+- **Polling QRIS:** backoff 5 → 30 dtk (`src/lib/polling.ts`), langsung cek saat tab aktif kembali. `btz-status` punya throttle 3 dtk per user+top up selama status pending.
+- **Sesi login:** `refresh()` kini hanya satu per satu (request bersamaan menunggu hasil yang sama) dan **tidak lagi menghapus sesi saat jaringan putus/server 5xx**; hanya ditolak server (4xx) yang menghapus sesi.
+- **`apiFn`** tahan respons non-JSON (mis. halaman error Vercel) dengan pesan yang ramah.
+- **Password minimal 8 karakter** (pendaftaran, reset admin di UI dan `api/admin-reset-password.js`). Login akun lama (6 karakter) tetap jalan.
+- **CSP:** script Chaport dipindah ke `public/chaport.js` sehingga `script-src` tidak lagi butuh `'unsafe-inline'` (masih *Report-Only*). Ditambah CSP minimal yang **ditegakkan**: `object-src 'none'; base-uri 'self'; frame-ancestors 'self'`. Untuk menegakkan penuh: buka situs, cek konsol (Chaport, Turnstile, Supabase), sesuaikan host, lalu ganti nama header `Content-Security-Policy-Report-Only` menjadi `Content-Security-Policy`.
+- **Handler Betabotz** dipindah ke factory di `api/_btzHandlers.js` (callback/status/cancel) sehingga bisa dites; perilakunya sama, kecuali kegagalan update DB setelah pembatalan di gateway kini dicatat (`mark_cancelled_failed`) dan dipulihkan oleh sinkronisasi berikutnya.
+- **Tes:** 16 → 71 tes (`pnpm test`): handler callback/status/cancel, throttle, cache TTL, aturan password, backoff polling, perilaku refresh token (`src/lib/session.test.ts`), serta antrean WA dan klien Cloud API (`bot/*.test.mjs`). Tes pgTAP untuk RPC gateway di `supabase/tests/` (jalankan `supabase test db`).
+- **CI:** guard `.env`, install `--frozen-lockfile` bila lockfile ada, lint ESLint (sementara tidak memblokir), `node --check bot/index.mjs`.
+- **Dibersihkan:** `src/ProfilePage.tsx` duplikat (v14 mencatat sudah dihapus, ternyata masih ada), `src/imports/3995.png` & `3996.png`, `whatsapp.webp`, file kosong `src/assets/icons/+`. Nama paket `figma-make-app` → `tuyyi-store`. `.env.example` memakai `SITE_URL` produksi.
+- **Dokumentasi DB:** banner di `schema.sql` (hanya bootstrap v1), `supabase/README.md` (urutan migrasi, cara snapshot).
+- Tipe `any` di `lib/supabase.ts` (`toSession`, `authRaw`, `catch`) diganti tipe eksplisit; riwayat top up di `SaldoPage` memakai tipe `TopupRow` (kolom `unique_code` yang tak dipakai dihapus dari select).
+- **Antrean WA (bot):** berjalan terus selama proses hidup (`bot/outbox-core.mjs`), bukan per soket. OTP kedaluwarsa kini dihapus kodenya dari `wa_outbox` walau bot sedang mati (dulu menumpuk sampai bot hidup lagi). `startOutbox` kini `startOutbox({ getSock })`.
+- **Cadangan OTP via WhatsApp Cloud API** (`bot/wa-cloud.mjs`): opsional, nonaktif kecuali `WA_CLOUD_*` di `bot/.env` terisi; hanya untuk OTP (template Authentication). Dites dengan fetch palsu, **belum diuji ke server Meta sungguhan**: coba sekali dengan nomor sendiri.
+
+**Belum dikerjakan (butuh akses/keputusan di luar kode):**
+- Menyiapkan akun WhatsApp Business Platform + template OTP yang disetujui Meta (kodenya sudah siap, akunnya belum).
+- Mengganti sisa `Row = Record<string, any>` (±70 pemakaian) dengan tipe hasil `supabase gen types` (butuh akses proyek Supabase); baru `SaldoPage` yang bertipe.
+- Snapshot skema terkini (`supabase db dump`) dan menjalankan tes pgTAP.
+- Menegakkan CSP penuh dan menjadikan lint memblokir CI (butuh uji di browser / pembersihan temuan awal).
+- `.figma/`, `AGENTS.md`, `CLAUDE.md` dibiarkan (alat Figma Make); hapus bila proyek tak lagi disunting di sana.
+
 ## v17: Top up manual dihapus, QR tampil di website (terbaru)
 
 - Jalankan `supabase/migration_v17.sql` (cabut `request_topup`). Halaman Saldo hanya **Bayar via QRIS**; QR dibuat di browser dari `qrisString` (paket `qrcode`). Server mengambil `qrisString` dari detail transaksi bila kosong saat create.

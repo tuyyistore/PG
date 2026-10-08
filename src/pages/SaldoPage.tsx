@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { api, apiFn, type Row } from '../lib/supabase'
+import { api, apiFn } from '../lib/supabase'
+import { pollDelay } from '../lib/polling'
 import { OtherPayMethods } from '../components/OtherPayMethods'
 import { Icon, formatRp, PageHeader, EmptyState, StatusBadge, SkeletonRows } from '../ui'
 import { useToast } from '../feedback'
@@ -18,8 +19,20 @@ function QrBox({ value }: { value: string }) {
   return <div className="flex justify-center"><img src={src} alt="QRIS" width={220} height={220} className="rounded-lg bg-white p-2" /></div>
 }
 
+/** Kolom yang di-select di loadHistory (PostgREST mengirim bigint sebagai number). */
+type TopupRow = {
+  id: number
+  amount: number
+  status: string
+  created_at: string
+  gateway: string | null
+  qris_string: string | null
+  total_amount: number | null
+  expired_at: string | null
+}
+
 export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: string; onPaid?: () => void }) {
-  const [history, setHistory] = useState<Row[] | null>(null)
+  const [history, setHistory] = useState<TopupRow[] | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [amount, setAmount] = useState('')
   const [gwCreating, setGwCreating] = useState(false)
@@ -27,7 +40,7 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
   const [err, setErr] = useState('')
   const toast = useToast()
 
-  const loadHistory = () => api(`topups?select=id,amount,unique_code,status,created_at,gateway,qris_string,total_amount,expired_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
+  const loadHistory = () => api<TopupRow[]>(`topups?select=id,amount,status,created_at,gateway,qris_string,total_amount,expired_at&user_id=eq.${userId}&order=id.desc&limit=10`).then(setHistory).catch(() => setHistory([]))
   const refreshHistory = async () => {
     if (refreshing) return
     setRefreshing(true)
@@ -71,12 +84,21 @@ export function SaldoPage({ saldo, userId, onPaid }: { saldo: number; userId: st
     } catch (e) { setErr((e as Error).message) } finally { setGwBusyId(null) }
   }
 
+  // Polling cadangan dengan backoff (5 → 30 dtk). Tab disembunyikan = lewati; kembali ke tab = langsung cek & mulai cepat lagi.
   const gwKey = gwPending.map(t => t.id).join(',')
   useEffect(() => {
     if (!gwKey) return
     const ids = gwKey.split(',').map(Number)
-    const timer = setInterval(() => { if (!document.hidden) ids.forEach(id => checkGateway(id, true)) }, 5000)
-    return () => clearInterval(timer)
+    let timer: ReturnType<typeof setTimeout>
+    let attempt = 0
+    const tick = () => {
+      if (!document.hidden) ids.forEach(id => checkGateway(id, true))
+      timer = setTimeout(tick, pollDelay(++attempt))
+    }
+    const onVisible = () => { if (!document.hidden) { clearTimeout(timer); attempt = 0; tick() } }
+    timer = setTimeout(tick, pollDelay(0))
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible) }
   }, [gwKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
